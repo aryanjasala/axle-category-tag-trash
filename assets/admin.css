@@ -42,3 +42,8 @@
 	margin-left: 6px;
 	vertical-align: baseline;
 }
+
+/* Core's red delete link is 4.4:1 on a striped row in WordPress before 7.0. */
+.ctt-page .row-actions .submitdelete {
+	color: var(--axle-error-text);
+}
