@@ -130,10 +130,30 @@ test.describe( 'Axle Category & Tag Trash', () => {
 		}
 		await page.goto( TRASH );
 
+		// Deleting one row asks first; saying no keeps it.
+		const batchA = page.locator( 'tr', { hasText: 'Batch A' } );
+		let asked = '';
+		page.once( 'dialog', ( dialog ) => {
+			asked = dialog.message();
+			dialog.dismiss();
+		} );
+		await batchA.hover();
+		await batchA.getByRole( 'link', { name: 'Delete permanently' } ).click();
+		await expect.poll( () => asked ).toContain( 'Delete "Batch A" for good?' );
+		expect( asked ).toContain( 'cannot be undone' );
+		await expect( batchA ).toHaveCount( 1 );
+
+		// The bulk delete asks too; saying yes deletes all three.
 		await page.locator( '#cb-select-all-1' ).check();
 		await page.locator( '#bulk-action-selector-top' ).selectOption( 'delete' );
+		asked = '';
+		page.once( 'dialog', ( dialog ) => {
+			asked = dialog.message();
+			dialog.accept();
+		} );
 		await page.locator( '#doaction' ).click();
 		await expect( page.locator( '.notice-success' ) ).toContainText( '3 terms deleted for good.' );
+		expect( asked ).toContain( 'Delete the selected terms for good?' );
 
 		make( [ 'Batch D' ] );
 		await page.goto( TRASH );

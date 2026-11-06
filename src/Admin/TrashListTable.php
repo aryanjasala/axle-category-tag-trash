@@ -197,7 +197,14 @@ final class TrashListTable extends \WP_List_Table {
 		if ( taxonomy_exists( $snapshot->taxonomy ) ) {
 			$actions['restore'] = sprintf( '<a href="%s" class="actt-restore">%s</a>', esc_url( TrashPage::action_url( 'restore', array( $item_id ) ) ), esc_html__( 'Restore', 'axle-category-tag-trash' ) );
 		}
-		$actions['delete'] = sprintf( '<a href="%s" class="submitdelete">%s</a>', esc_url( TrashPage::action_url( 'delete', array( $item_id ) ) ), esc_html__( 'Delete permanently', 'axle-category-tag-trash' ) );
+		/* translators: %s: term name. */
+		$confirm           = sprintf( __( 'Delete "%s" for good? It leaves the trash and cannot be restored. This cannot be undone.', 'axle-category-tag-trash' ), $snapshot->name );
+		$actions['delete'] = sprintf(
+			'<a href="%s" class="submitdelete" onclick="return window.confirm( \'%s\' );">%s</a>',
+			esc_url( TrashPage::action_url( 'delete', array( $item_id ) ) ),
+			esc_attr( esc_js( $confirm ) ),
+			esc_html__( 'Delete permanently', 'axle-category-tag-trash' )
+		);
 
 		return sprintf(
 			'<strong class="actt-name">%s</strong> <code class="actt-slug">%s</code>%s%s',

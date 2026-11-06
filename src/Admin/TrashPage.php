@@ -166,8 +166,11 @@ final class TrashPage implements Service {
 			</p>
 
 			<?php if ( $total || $table->has_items() ) : ?>
-				<?php $table->views(); ?>
-				<form method="get">
+				<?php
+				$table->views();
+				$bulk_confirm = __( 'Delete the selected terms for good? They leave the trash and cannot be restored. This cannot be undone.', 'axle-category-tag-trash' );
+				?>
+				<form method="get" onsubmit="var a = this.elements.action, b = this.elements.action2, v = a && '-1' !== a.value ? a.value : ( b ? b.value : '' ); return 'delete' !== v || window.confirm( '<?php echo esc_js( $bulk_confirm ); ?>' );">
 					<input type="hidden" name="page" value="<?php echo esc_attr( self::SLUG ); ?>">
 					<?php if ( $table->current_taxonomy() ) : ?>
 						<input type="hidden" name="taxonomy" value="<?php echo esc_attr( $table->current_taxonomy() ); ?>">
