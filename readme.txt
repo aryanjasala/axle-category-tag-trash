@@ -4,7 +4,7 @@ Tags: trash, categories, tags, undo, restore
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 3.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,6 +79,10 @@ Yes. The posts are saved in small chunks, so the trash stays light. A restore br
 3. What a restore brings back.
 
 == Changelog ==
+
+= 3.0.0 =
+* Changed (breaking change): rename to Axle Category & Tag Trash for WordPress.org
+* Fix: clean the term cache once per object type
 
 = 2.0.0 =
 * Changed (breaking change): rename to Axle Category & Tag Trash for WordPress.org
