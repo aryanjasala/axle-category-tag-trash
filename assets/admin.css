@@ -1,37 +1,4 @@
-.ctt-inline {
-	display: inline;
-}
-
-.ctt-page .ctt-empty {
-	color: #b32d2e;
-	border-color: #b32d2e;
-}
-
-.ctt-page .ctt-empty:hover,
-.ctt-page .ctt-empty:focus {
-	background: #b32d2e;
-	border-color: #b32d2e;
-	color: #fff;
-}
-
-.ctt-intro {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: space-between;
-	align-items: center;
-	gap: 8px 24px;
-	margin: 8px 0 4px;
-}
-
-.ctt-intro p {
-	margin: 0;
-}
-
-.ctt-retention {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-}
+/* Layout that only this plugin needs. Components come from axle-ui.css. */
 
 .ctt-page .column-taxonomy {
 	width: 14%;
@@ -49,30 +16,20 @@
 	font-size: 11px;
 }
 
-.ctt-muted {
-	color: #646970;
-}
-
-.ctt-warning {
-	color: #b32d2e;
-}
-
 .ctt-details {
 	margin-top: 6px;
 }
 
 .ctt-details summary {
 	cursor: pointer;
-	color: #2271b1;
+	color: var(--wp-admin-theme-color, #2271b1);
 }
 
 .ctt-details p {
 	margin: 6px 0 0;
 }
 
-.category-tag-trash-note {
-	color: #646970;
-}
+/* Term list screens (Categories, Tags): the note under the table and the Undo button. */
 
 .category-tag-trash-note .dashicons {
 	font-size: 16px;
