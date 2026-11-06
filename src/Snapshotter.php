@@ -66,7 +66,7 @@ final class Snapshotter implements Service {
 	 * @return string
 	 */
 	public static function undo_key( int $user_id ): string {
-		return 'category_tag_trash_undo_' . $user_id;
+		return 'axle_category_tag_trash_undo_' . $user_id;
 	}
 
 	/**
@@ -83,15 +83,15 @@ final class Snapshotter implements Service {
 		$term = get_term( (int) $term_id, (string) $taxonomy );
 
 		/**
-		 * Filters whether one deleted term goes to Category & Tag Trash.
+		 * Filters whether one deleted term goes to Axle Category & Tag Trash.
 		 *
-		 * The taxonomy filter (category_tag_trash_supports_taxonomy) decides per taxonomy.
+		 * The taxonomy filter (axle_category_tag_trash_supports_taxonomy) decides per taxonomy.
 		 * This one decides per term, for example to let empty tags go for good.
 		 *
 		 * @param bool     $keep Whether to keep the term. Default true.
 		 * @param \WP_Term $term The term being deleted.
 		 */
-		if ( ! $term instanceof \WP_Term || ! apply_filters( 'category_tag_trash_keep_term', true, $term ) ) {
+		if ( ! $term instanceof \WP_Term || ! apply_filters( 'axle_category_tag_trash_keep_term', true, $term ) ) {
 			return;
 		}
 
@@ -125,12 +125,12 @@ final class Snapshotter implements Service {
 
 		if ( $item_id ) {
 			/**
-			 * Fires after a deleted term lands in Category & Tag Trash.
+			 * Fires after a deleted term lands in Axle Category & Tag Trash.
 			 *
 			 * @param int      $item_id  Trash item ID.
 			 * @param Snapshot $snapshot What was saved.
 			 */
-			do_action( 'category_tag_trash_trashed', $item_id, $snapshot );
+			do_action( 'axle_category_tag_trash_trashed', $item_id, $snapshot );
 		}
 
 		if ( $item_id && $user_id && is_admin() && ! wp_doing_ajax() ) {
@@ -141,7 +141,7 @@ final class Snapshotter implements Service {
 			 *
 			 * @param int $seconds Default 300.
 			 */
-			set_transient( self::undo_key( $user_id ), array_values( array_filter( $undo ) ), max( 30, (int) apply_filters( 'category_tag_trash_undo_seconds', 5 * MINUTE_IN_SECONDS ) ) );
+			set_transient( self::undo_key( $user_id ), array_values( array_filter( $undo ) ), max( 30, (int) apply_filters( 'axle_category_tag_trash_undo_seconds', 5 * MINUTE_IN_SECONDS ) ) );
 		}
 	}
 

@@ -4,11 +4,11 @@
   "exclude": [],
   "screens": [
     {
-      "name": "Tools > Category & Tag Trash, empty",
-      "url": "/wp-admin/tools.php?page=category-tag-trash"
+      "name": "Tools > Axle Category & Tag Trash, empty",
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash"
     },
     {
-      "name": "Tools > Category & Tag Trash with trashed terms and one restore preview open",
+      "name": "Tools > Axle Category & Tag Trash with trashed terms and one restore preview open",
       "setup": [
         { "wp": ["term", "create", "category", "Recipes", "--description=Everything we cook", "--porcelain"], "save": "recipes" },
         ["post", "create", "--post_title=Sourdough basics", "--post_status=publish", "--post_category={recipes}"],
@@ -16,10 +16,10 @@
         ["term", "delete", "category", "{recipes}"],
         ["term", "delete", "post_tag", "{summer}"]
       ],
-      "url": "/wp-admin/tools.php?page=category-tag-trash",
-      "steps": [{ "click": ".ctt-details summary" }],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
+      "steps": [{ "click": ".actt-details summary" }],
       "cleanup": [
-        ["category-tag-trash", "delete", "--all", "--yes"],
+        ["axle-category-tag-trash", "delete", "--all", "--yes"],
         ["eval", "foreach ( get_posts( array( 'title' => 'Sourdough basics', 'post_status' => 'any', 'numberposts' => -1, 'fields' => 'ids' ) ) as $id ) { wp_delete_post( $id, true ); }"]
       ]
     },
@@ -31,10 +31,10 @@
       "steps": [
         { "hover": "#tag-{travel}" },
         { "click": "#tag-{travel} .delete-tag" },
-        { "waitFor": ".category-tag-trash-undo" }
+        { "waitFor": ".axle-category-tag-trash-undo" }
       ],
-      "include": [".category-tag-trash-undo"],
-      "cleanup": [["category-tag-trash", "delete", "--all", "--yes"]]
+      "include": [".axle-category-tag-trash-undo"],
+      "cleanup": [["axle-category-tag-trash", "delete", "--all", "--yes"]]
     }
   ],
   "skip": {}

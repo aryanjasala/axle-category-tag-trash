@@ -14,12 +14,12 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Purger implements Service {
 
-	public const HOOK = 'category_tag_trash_purge';
+	public const HOOK = 'axle_category_tag_trash_purge';
 
 	/**
 	 * Cron hook that keeps emptying the trash after "Empty trash".
 	 */
-	public const EMPTY_HOOK = 'category_tag_trash_empty';
+	public const EMPTY_HOOK = 'axle_category_tag_trash_empty';
 
 	private const BATCH       = 100;
 	private const MAX_BATCHES = 20;
@@ -114,7 +114,7 @@ final class Purger implements Service {
 			 *
 			 * @param int $deleted Number of trashed terms deleted.
 			 */
-			do_action( 'category_tag_trash_purged', $deleted );
+			do_action( 'axle_category_tag_trash_purged', $deleted );
 		}
 
 		return $deleted;

@@ -14,21 +14,21 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Settings {
 
-	public const OPTION         = 'category_tag_trash_settings';
+	public const OPTION         = 'axle_category_tag_trash_settings';
 	public const RETENTION_DAYS = array( 7, 30, 90, 365 );
 
 	/**
-	 * Retention periods offered on Tools > Category & Tag Trash.
+	 * Retention periods offered on Tools > Axle Category & Tag Trash.
 	 *
 	 * @return int[] Days, shortest first.
 	 */
 	public static function retention_choices(): array {
 		/**
-		 * Filters the retention periods offered on Tools > Category & Tag Trash.
+		 * Filters the retention periods offered on Tools > Axle Category & Tag Trash.
 		 *
 		 * @param int[] $days Default 7, 30, 90 and 365.
 		 */
-		$days = array_values( array_unique( array_filter( array_map( 'absint', (array) apply_filters( 'category_tag_trash_retention_choices', self::RETENTION_DAYS ) ) ) ) );
+		$days = array_values( array_unique( array_filter( array_map( 'absint', (array) apply_filters( 'axle_category_tag_trash_retention_choices', self::RETENTION_DAYS ) ) ) ) );
 		sort( $days );
 
 		return $days ? $days : self::RETENTION_DAYS;
@@ -49,7 +49,7 @@ final class Settings {
 		 *
 		 * @param int $days Number of days.
 		 */
-		return max( 1, (int) apply_filters( 'category_tag_trash_retention_days', $days ) );
+		return max( 1, (int) apply_filters( 'axle_category_tag_trash_retention_days', $days ) );
 	}
 
 	/**

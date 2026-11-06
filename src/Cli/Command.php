@@ -1,6 +1,6 @@
 <?php
 /**
- * `wp category-tag-trash` commands.
+ * `wp axle-category-tag-trash` commands.
  *
  * @package AryanX\Axle\CategoryTagTrash
  */
@@ -119,7 +119,7 @@ final class Command {
 	 * ## OPTIONS
 	 *
 	 * <id>...
-	 * : Trash item IDs from `wp category-tag-trash list`.
+	 * : Trash item IDs from `wp axle-category-tag-trash list`.
 	 *
 	 * @param array $args Positional arguments.
 	 */
@@ -144,7 +144,7 @@ final class Command {
 	 * ## OPTIONS
 	 *
 	 * [<id>...]
-	 * : Trash item IDs from `wp category-tag-trash list`.
+	 * : Trash item IDs from `wp axle-category-tag-trash list`.
 	 *
 	 * [--all]
 	 * : Empty the whole trash.
@@ -157,7 +157,7 @@ final class Command {
 	 */
 	public function delete( array $args, array $assoc_args ): void {
 		if ( ! empty( $assoc_args['all'] ) ) {
-			\WP_CLI::confirm( 'Delete everything in Category & Tag Trash for good?', $assoc_args );
+			\WP_CLI::confirm( 'Delete everything in Axle Category & Tag Trash for good?', $assoc_args );
 			$deleted = 0;
 			do {
 				$result   = $this->purger->empty_trash( 1000 );

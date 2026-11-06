@@ -1,49 +1,49 @@
 /* Layout that only this plugin needs. Components come from axle-ui.css. */
 
-.ctt-page .column-taxonomy {
+.actt-page .column-taxonomy {
 	width: 14%;
 }
 
-.ctt-page .column-attached {
+.actt-page .column-attached {
 	width: 22%;
 }
 
-.ctt-page .column-deleted {
+.actt-page .column-deleted {
 	width: 16%;
 }
 
-.ctt-slug {
+.actt-slug {
 	font-size: 11px;
 }
 
-.ctt-details {
+.actt-details {
 	margin-top: 6px;
 }
 
-.ctt-details summary {
+.actt-details summary {
 	cursor: pointer;
 	color: var(--wp-admin-theme-color-darker-10, #135e96);
 }
 
-.ctt-details p {
+.actt-details p {
 	margin: 6px 0 0;
 }
 
 /* Term list screens (Categories, Tags): the note under the table and the Undo button. */
 
-.category-tag-trash-note .dashicons {
+.axle-category-tag-trash-note .dashicons {
 	font-size: 16px;
 	width: 16px;
 	height: 16px;
 	vertical-align: text-bottom;
 }
 
-.category-tag-trash-undo .button {
+.axle-category-tag-trash-undo .button {
 	margin-left: 6px;
 	vertical-align: baseline;
 }
 
 /* The shared danger button text (#d63638) is 4.4:1 on core's button background before WordPress 7.0. */
-.ctt-page .button.axle-button--danger {
+.actt-page .button.axle-button--danger {
 	color: var(--axle-error-text);
 }

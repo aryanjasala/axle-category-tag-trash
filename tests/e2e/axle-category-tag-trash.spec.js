@@ -1,6 +1,6 @@
 const { test, expect, wp, wpEval } = require( './utils' );
 
-const TRASH = '/wp-admin/tools.php?page=category-tag-trash';
+const TRASH = '/wp-admin/tools.php?page=axle-category-tag-trash';
 
 /**
  * A category with a child, meta, two posts and a menu link.
@@ -32,7 +32,7 @@ function expectFullyRestored( ids, prefix ) {
 	expect( wp( 'menu', 'item', 'list', String( ids.menu ), '--fields=object_id', '--format=csv' ).split( '\n' ).slice( 1 ) ).toEqual( [ String( ids.cat ) ] );
 }
 
-test.describe( 'Category & Tag Trash', () => {
+test.describe( 'Axle Category & Tag Trash', () => {
 	test.afterAll( () => {
 		wp( 'site', 'empty', '--yes' );
 	} );
@@ -46,9 +46,9 @@ test.describe( 'Category & Tag Trash', () => {
 		await row.hover();
 		await row.locator( '.delete-tag' ).click();
 
-		const notice = page.locator( '.category-tag-trash-undo' );
-		await expect( notice ).toContainText( '"Undo Recipes" moved to Category & Tag Trash.' );
-		await expect( page.locator( '.category-tag-trash-note a' ) ).toHaveText( 'View Category & Tag Trash (1)' );
+		const notice = page.locator( '.axle-category-tag-trash-undo' );
+		await expect( notice ).toContainText( '"Undo Recipes" moved to Axle Category & Tag Trash.' );
+		await expect( page.locator( '.axle-category-tag-trash-note a' ) ).toHaveText( 'View Axle Category & Tag Trash (1)' );
 		await expect( row ).toHaveCount( 0 );
 		expect( categoriesOf( ids.only ) ).toEqual( [ 'Uncategorized' ] );
 
@@ -68,11 +68,11 @@ test.describe( 'Category & Tag Trash', () => {
 		await page.locator( '#bulk-action-selector-top' ).selectOption( 'delete' );
 		await page.locator( '#doaction' ).click();
 
-		const notice = page.locator( '.category-tag-trash-undo' );
-		await expect( notice ).toContainText( '2 terms moved to Category & Tag Trash.' );
+		const notice = page.locator( '.axle-category-tag-trash-undo' );
+		await expect( notice ).toContainText( '2 terms moved to Axle Category & Tag Trash.' );
 		await notice.getByRole( 'link', { name: 'Undo' } ).click();
 
-		await expect( page.locator( '.ctt-restored' ) ).toContainText( 'Restored Bulk one, Bulk two.' );
+		await expect( page.locator( '.actt-restored' ) ).toContainText( 'Restored Bulk one, Bulk two.' );
 		await expect( page.locator( `#tag-${ tags[ 0 ] }` ) ).toBeVisible();
 		await expect( page.locator( `#tag-${ tags[ 1 ] }` ) ).toBeVisible();
 	} );
@@ -89,24 +89,24 @@ test.describe( 'Category & Tag Trash', () => {
 
 		await page.locator( '.subsubsub' ).getByRole( 'link', { name: /Tags/ } ).click();
 		await expect( page.locator( '#the-list tr' ) ).toHaveCount( 1 );
-		await expect( page.locator( '#the-list .ctt-name' ) ).toHaveText( 'Screen tag' );
+		await expect( page.locator( '#the-list .actt-name' ) ).toHaveText( 'Screen tag' );
 
 		await page.goto( TRASH );
-		await page.locator( '#category-tag-trash-search-input' ).fill( 'Recipes' );
+		await page.locator( '#axle-category-tag-trash-search-input' ).fill( 'Recipes' );
 		await page.locator( '#search-submit' ).click();
 		const row = page.locator( '#the-list tr' );
 		await expect( row ).toHaveCount( 1 );
 		await expect( row.locator( '.column-attached' ) ).toHaveText( '2 items · 1 child term · 1 menu link' );
 
-		await row.locator( '.ctt-details summary' ).click();
-		const details = row.locator( '.ctt-details' );
+		await row.locator( '.actt-details summary' ).click();
+		const details = row.locator( '.actt-details' );
 		await expect( details ).toContainText( 'Screen only recipes' );
 		await expect( details ).toContainText( 'Screen Desserts' );
 		await expect( details ).toContainText( 'Screen Menu' );
 
 		await row.hover();
-		await row.locator( '.ctt-restore' ).click();
-		await expect( page.locator( '.ctt-restored' ) ).toContainText( 'Restored Screen Recipes.' );
+		await row.locator( '.actt-restore' ).click();
+		await expect( page.locator( '.actt-restored' ) ).toContainText( 'Restored Screen Recipes.' );
 		expectFullyRestored( ids, 'Screen' );
 	} );
 
@@ -122,13 +122,14 @@ test.describe( 'Category & Tag Trash', () => {
 		await page.locator( '#cb-select-all-1' ).check();
 		await page.locator( '#bulk-action-selector-top' ).selectOption( 'restore' );
 		await page.locator( '#doaction' ).click();
-		await expect( page.locator( '.ctt-restored' ) ).toContainText( 'Batch A' );
-		await expect( page.locator( '.axle-empty' ) ).toContainText( 'Category & Tag Trash is empty.' );
+		await expect( page.locator( '.actt-restored' ) ).toContainText( 'Batch A' );
+		await expect( page.locator( '.axle-empty' ) ).toContainText( 'Axle Category & Tag Trash is empty.' );
 
 		for ( const slug of [ 'batch-a', 'batch-b', 'batch-c' ] ) {
 			wp( 'term', 'delete', 'post_tag', wp( 'term', 'get', 'post_tag', slug, '--by=slug', '--field=term_id' ) );
 		}
 		await page.goto( TRASH );
+
 		await page.locator( '#cb-select-all-1' ).check();
 		await page.locator( '#bulk-action-selector-top' ).selectOption( 'delete' );
 		await page.locator( '#doaction' ).click();
@@ -146,11 +147,11 @@ test.describe( 'Category & Tag Trash', () => {
 		expect( confirmed ).toContain( 'cannot be undone' );
 		await expect( page.getByRole( 'button', { name: 'Empty trash' } ) ).toHaveCount( 0 );
 
-		await page.locator( '#ctt-retention' ).selectOption( '90' );
+		await page.locator( '#actt-retention' ).selectOption( '90' );
 		await page.getByRole( 'button', { name: 'Save retention' } ).click();
 		await expect( page.locator( '.notice-success' ) ).toContainText( 'Settings saved.' );
-		await expect( page.locator( '.ctt-intro' ) ).toContainText( 'kept here for 90 days' );
-		wp( 'option', 'delete', 'category_tag_trash_settings' );
+		await expect( page.locator( '.actt-intro' ) ).toContainText( 'kept here for 90 days' );
+		wp( 'option', 'delete', 'axle_category_tag_trash_settings' );
 	} );
 
 	test( 'a category on 6,200 posts is kept in chunks and restored in the background', async ( { page } ) => {
@@ -190,13 +191,13 @@ test.describe( 'Category & Tag Trash', () => {
 		wp( 'term', 'delete', 'category', String( cat ) );
 		expect( countRows( `tt.term_id = 1 AND tr.${ inRange }` ) ).toBe( POSTS );
 
-		const itemId = Number( wp( 'category-tag-trash', 'list', '--format=ids' ).split( ' ' )[ 0 ] );
+		const itemId = Number( wp( 'axle-category-tag-trash', 'list', '--format=ids' ).split( ' ' )[ 0 ] );
 		const stored = JSON.parse(
 			wpEval( `
 				echo wp_json_encode( array(
-					'objects'  => count( get_post_meta( ${ itemId }, '_category_tag_trash_objects' ) ),
-					'fallback' => count( get_post_meta( ${ itemId }, '_category_tag_trash_fallback' ) ),
-					'snapshot' => strlen( maybe_serialize( get_post_meta( ${ itemId }, '_category_tag_trash_snapshot', true ) ) ),
+					'objects'  => count( get_post_meta( ${ itemId }, '_axle_category_tag_trash_objects' ) ),
+					'fallback' => count( get_post_meta( ${ itemId }, '_axle_category_tag_trash_fallback' ) ),
+					'snapshot' => strlen( maybe_serialize( get_post_meta( ${ itemId }, '_axle_category_tag_trash_snapshot', true ) ) ),
 				) );
 			` )
 		);
@@ -208,8 +209,8 @@ test.describe( 'Category & Tag Trash', () => {
 		const row = page.locator( '#the-list tr', { hasText: 'Big archive' } );
 		await expect( row.locator( '.column-attached' ) ).toHaveText( '6,200 items' );
 		await row.hover();
-		await row.locator( '.ctt-restore' ).click();
-		await expect( page.locator( '.ctt-notes, .notice' ).filter( { hasText: 'being re-attached in the background' } ) ).toBeVisible();
+		await row.locator( '.actt-restore' ).click();
+		await expect( page.locator( '.actt-notes, .notice' ).filter( { hasText: 'being re-attached in the background' } ) ).toBeVisible();
 		await expect( page.locator( '#the-list tr', { hasText: 'Big archive' } ) ).toHaveCount( 0 );
 
 		// The first 5,000 came back in the request, the rest wait for cron.
@@ -218,9 +219,9 @@ test.describe( 'Category & Tag Trash', () => {
 		expect( wpEval( `echo get_post_status( ${ itemId } );` ) ).toBe( 'pending' );
 
 		// One cron run, then WP-CLI finishes the rest.
-		wp( 'cron', 'event', 'run', 'category_tag_trash_restore_batch' );
+		wp( 'cron', 'event', 'run', 'axle_category_tag_trash_restore_batch' );
 		expect( countRows( `tt.term_id = ${ cat }` ) ).toBe( POSTS );
-		wp( 'category-tag-trash', 'restore', String( itemId ) );
+		wp( 'axle-category-tag-trash', 'restore', String( itemId ) );
 
 		expect( countRows( `tt.term_id = 1 AND tr.${ inRange }` ) ).toBe( 0 );
 		expect( Number( wp( 'term', 'get', 'category', String( cat ), '--field=count' ) ) ).toBe( POSTS );
@@ -234,12 +235,12 @@ test.describe( 'Category & Tag Trash', () => {
 		wp( 'term', 'delete', 'category', String( ids.cat ) );
 		const tag = wp( 'term', 'create', 'post_tag', 'Agent tag', '--porcelain' );
 		wp( 'term', 'delete', 'post_tag', tag );
-		const path = ( name ) => `/wp-abilities/v1/abilities/category-tag-trash/${ name }/run`;
+		const path = ( name ) => `/wp-abilities/v1/abilities/axle-category-tag-trash/${ name }/run`;
 
-		const listed = await rest( 'GET', '/wp-abilities/v1/abilities?category=category-tag-trash' );
-		expect( listed.body.map( ( ability ) => ability.name ).sort() ).toEqual( [ 'category-tag-trash/delete', 'category-tag-trash/list', 'category-tag-trash/restore' ] );
+		const listed = await rest( 'GET', '/wp-abilities/v1/abilities?category=axle-category-tag-trash' );
+		expect( listed.body.map( ( ability ) => ability.name ).sort() ).toEqual( [ 'axle-category-tag-trash/delete', 'axle-category-tag-trash/list', 'axle-category-tag-trash/restore' ] );
 		// MCP clients only list abilities marked public.
-		expect( JSON.parse( wpEval( `echo wp_json_encode( array_values( array_filter( array_map( function ( $ability ) { $meta = $ability->get_meta(); return ( ! empty( $meta['public'] ) && ! empty( $meta['mcp']['public'] ) ) ? '' : $ability->get_name(); }, wp_get_abilities() ), function ( $name ) { return 0 === strpos( $name, 'category-tag-trash/' ); } ) ) );` ) ) ).toEqual( [] );
+		expect( JSON.parse( wpEval( `echo wp_json_encode( array_values( array_filter( array_map( function ( $ability ) { $meta = $ability->get_meta(); return ( ! empty( $meta['public'] ) && ! empty( $meta['mcp']['public'] ) ) ? '' : $ability->get_name(); }, wp_get_abilities() ), function ( $name ) { return 0 === strpos( $name, 'axle-category-tag-trash/' ); } ) ) );` ) ) ).toEqual( [] );
 
 		const trashed = await rest( 'GET', `${ path( 'list' ) }?input[taxonomy]=category&input[search]=Agent` );
 		expect( trashed.status ).toBe( 200 );
@@ -248,7 +249,7 @@ test.describe( 'Category & Tag Trash', () => {
 		expect( item ).toMatchObject( { term_id: ids.cat, name: 'Agent Recipes', taxonomy: 'category', objects: 2, children: 1, menu_links: 1 } );
 
 		const missing = await rest( 'POST', path( 'restore' ), { input: { id: 999999 } } );
-		expect( missing.body.code ).toBe( 'category_tag_trash_missing' );
+		expect( missing.body.code ).toBe( 'axle_category_tag_trash_missing' );
 
 		const restored = await rest( 'POST', path( 'restore' ), { input: { id: item.id } } );
 		expect( restored.status ).toBe( 200 );
@@ -268,8 +269,8 @@ test.describe( 'Category & Tag Trash', () => {
 		wp( 'term', 'delete', 'category', id );
 		wp( 'term', 'create', 'category', 'Reused' );
 
-		const [ itemId ] = wp( 'category-tag-trash', 'list', '--format=ids' ).split( ' ' );
-		const output = wp( 'category-tag-trash', 'restore', itemId );
+		const [ itemId ] = wp( 'axle-category-tag-trash', 'list', '--format=ids' ).split( ' ' );
+		const output = wp( 'axle-category-tag-trash', 'restore', itemId );
 		expect( output ).toContain( `Restored term ${ id }.` );
 		expect( output ).toContain( 'restored as "reused-2"' );
 		expect( wp( 'term', 'get', 'category', id, '--field=slug' ) ).toBe( 'reused-2' );

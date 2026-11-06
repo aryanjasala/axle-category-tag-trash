@@ -1,7 +1,7 @@
 {
 	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
 	"meta": {
-		"title": "Category & Tag Trash demo",
+		"title": "Axle Category & Tag Trash demo",
 		"author": "aryanjasala"
 	},
 	"landingPage": "/wp-admin/edit-tags.php?taxonomy=category",
@@ -18,12 +18,12 @@
 			"step": "installPlugin",
 			"pluginData": {
 				"resource": "git:directory",
-				"url": "https://github.com/aryanjasala/category-tag-trash",
+				"url": "https://github.com/aryanjasala/axle-category-tag-trash",
 				"ref": "main"
 			},
 			"options": {
 				"activate": true,
-				"targetFolderName": "category-tag-trash"
+				"targetFolderName": "axle-category-tag-trash"
 			}
 		},
 		{

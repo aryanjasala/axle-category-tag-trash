@@ -20,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class AxleUi {
 
-	public const HANDLE = 'category-tag-trash-axle-ui';
+	public const HANDLE = 'axle-category-tag-trash-axle-ui';
 
 	/**
 	 * Registers and enqueues the shared stylesheet. Call it from the
@@ -36,11 +36,11 @@ final class AxleUi {
 	public static function footer(): void {
 		printf(
 			'<p class="axle-footer">%1$s &middot; <a href="%2$s">%3$s</a> &middot; <a href="%4$s">%5$s</a></p>',
-			esc_html__( 'Part of Axle by AryanX', 'category-tag-trash' ),
-			esc_url( 'https://axlewp.com/plugins/category-tag-trash/' ),
-			esc_html__( 'Documentation', 'category-tag-trash' ),
-			esc_url( 'https://wordpress.org/support/plugin/category-tag-trash/' ),
-			esc_html__( 'Support', 'category-tag-trash' )
+			esc_html__( 'Part of Axle by AryanX', 'axle-category-tag-trash' ),
+			esc_url( 'https://axlewp.com/plugins/axle-category-tag-trash/' ),
+			esc_html__( 'Documentation', 'axle-category-tag-trash' ),
+			esc_url( 'https://wordpress.org/support/plugin/axle-category-tag-trash/' ),
+			esc_html__( 'Support', 'axle-category-tag-trash' )
 		);
 	}
 }

@@ -1,4 +1,4 @@
-=== Category & Tag Trash ===
+=== Axle Category & Tag Trash ===
 Contributors: aryanjasala
 Tags: trash, categories, tags, undo, restore
 Requires at least: 6.6
@@ -14,9 +14,9 @@ A trash for categories, tags and custom terms. Deleted a category by mistake? Re
 
 Posts and pages go to the trash when you delete them. Categories and tags don't: one click on "Delete" and the term is gone. WordPress also moves its posts to "Uncategorized", moves its child categories up a level and removes it from your menus. Getting it back means restoring a database backup.
 
-Category & Tag Trash keeps every deleted term for 30 days (or 7, 90 or 365, your choice).
+Axle Category & Tag Trash keeps every deleted term for 30 days (or 7, 90 or 365, your choice).
 
-**Undo** appears the moment you delete a term, on the Categories, Tags or any other term screen, for single and bulk deletes. **Restore** later from Tools > Category & Tag Trash puts back:
+**Undo** appears the moment you delete a term, on the Categories, Tags or any other term screen, for single and bulk deletes. **Restore** later from Tools > Axle Category & Tag Trash puts back:
 
 * the term itself, with the **same ID**, name, slug, description and parent,
 * all of its term meta (colours, images, SEO fields stored by other plugins),
@@ -33,24 +33,24 @@ Free and open source under the GPL. No pro version, no upsells, no ads in wp-adm
 
 = Where to find it =
 
-* **Tools > Category & Tag Trash** lists deleted terms with what they were attached to, who deleted them and when. Filter by taxonomy, search, restore or delete in bulk, see exactly which posts, child terms and menus a restore brings back, and empty the trash.
+* **Tools > Axle Category & Tag Trash** lists deleted terms with what they were attached to, who deleted them and when. Filter by taxonomy, search, restore or delete in bulk, see exactly which posts, child terms and menus a restore brings back, and empty the trash.
 * Every category and tag screen has a link to it under the list.
 
 = WP-CLI =
 
-* `wp category-tag-trash list`
-* `wp category-tag-trash restore <id>...`
-* `wp category-tag-trash delete <id>...` or `wp category-tag-trash delete --all`
+* `wp axle-category-tag-trash list`
+* `wp axle-category-tag-trash restore <id>...`
+* `wp axle-category-tag-trash delete <id>...` or `wp axle-category-tag-trash delete --all`
 
-**Try it before you install.** [try.axlewp.com/category-tag-trash](https://try.axlewp.com/category-tag-trash) opens a private WordPress in your browser with this plugin and some demo content.
+**Try it before you install.** [try.axlewp.com/axle-category-tag-trash](https://try.axlewp.com/axle-category-tag-trash) opens a private WordPress in your browser with this plugin and some demo content.
 
-Part of [Axle](https://axlewp.com/), a family of free plugins for running WordPress sites safely.
+Part of [Axle](https://axlewp.com/) by AryanX, a family of free plugins for running WordPress sites safely.
 
 == Frequently Asked Questions ==
 
 = What happens if a new term uses the old slug? =
 
-The restored term gets a unique slug instead, and Category & Tag Trash tells you which one.
+The restored term gets a unique slug instead, and Axle Category & Tag Trash tells you which one.
 
 = What if a post was deleted while the term was in the trash? =
 
@@ -62,26 +62,26 @@ Only posts that still have exactly the default category plus the restored term l
 
 = How long are terms kept? =
 
-30 days by default, then a daily task deletes them for good. Choose 7, 30, 90 or 365 days on the Category & Tag Trash screen, or use the `category_tag_trash_retention_days` filter.
+30 days by default, then a daily task deletes them for good. Choose 7, 30, 90 or 365 days on the Axle Category & Tag Trash screen, or use the `axle_category_tag_trash_retention_days` filter.
 
 = Can I leave a taxonomy out? =
 
-Use the `category_tag_trash_supports_taxonomy` filter. Menus are never kept, because deleting a menu removes its items first.
+Use the `axle_category_tag_trash_supports_taxonomy` filter. Menus are never kept, because deleting a menu removes its items first.
 
 = Does it work for a tag on thousands of posts? =
 
-Yes. The posts are saved in small chunks, so the trash stays light. A restore brings back the first 5,000 posts right away and the rest in the background, and `wp category-tag-trash restore <id>` does it all in one go. Search plugins like ElasticPress are told about every post that gets its term back.
+Yes. The posts are saved in small chunks, so the trash stays light. A restore brings back the first 5,000 posts right away and the rest in the background, and `wp axle-category-tag-trash restore <id>` does it all in one go. Search plugins like ElasticPress are told about every post that gets its term back.
 
 == Screenshots ==
 
 1. Undo right after deleting a category.
-2. Tools > Category & Tag Trash.
+2. Tools > Axle Category & Tag Trash.
 3. What a restore brings back.
 
 == Changelog ==
 
 = 2.0.0 =
-* Changed (breaking change): rename to Category & Tag Trash for WordPress.org
+* Changed (breaking change): rename to Axle Category & Tag Trash for WordPress.org
 
 = 1.3.0 =
 * Fix: make the abilities visible to MCP agents
@@ -90,11 +90,11 @@ Yes. The posts are saved in small chunks, so the trash stays light. A restore br
 = 1.2.0 =
 * New: add filters for which terms are kept, retention choices and the Undo window, and actions for trash events
 * Fix: keep big terms safe to delete and restore on large sites
-* Fix: update the Category & Tag Trash count right after a delete
+* Fix: update the Axle Category & Tag Trash count right after a delete
 
 = 1.1.0 =
 * New: Undo notice right after deleting a term, for single and bulk deletes.
-* New: Category & Tag Trash screen rebuilt as a list table with taxonomy tabs, search, bulk restore and delete, Empty trash, and a "what restore brings back" view.
+* New: Axle Category & Tag Trash screen rebuilt as a list table with taxonomy tabs, search, bulk restore and delete, Empty trash, and a "what restore brings back" view.
 * New: choose how long deleted terms are kept.
 * Rewritten as PSR-4 classes.
 

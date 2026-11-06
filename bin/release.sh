@@ -15,7 +15,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-slug="category-tag-trash"
+slug="axle-category-tag-trash"
 main_file="$slug.php"
 
 header_version() {

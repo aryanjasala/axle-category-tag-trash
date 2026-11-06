@@ -31,24 +31,24 @@ test.describe.serial( 'Screenshots', () => {
 		const row = page.locator( `#tag-${ recipes }` );
 		await row.hover();
 		await row.locator( '.delete-tag' ).click();
-		await expect( page.locator( '.category-tag-trash-undo' ) ).toBeVisible();
+		await expect( page.locator( '.axle-category-tag-trash-undo' ) ).toBeVisible();
 		await expect( row ).toHaveCount( 0 );
 		await shot( page, 1 );
 	} );
 
-	test( '2: Tools > Category & Tag Trash', async ( { page } ) => {
+	test( '2: Tools > Axle Category & Tag Trash', async ( { page } ) => {
 		wp( 'term', 'delete', 'category', wp( 'term', 'get', 'category', 'travel', '--by=slug', '--field=term_id' ) );
 		const tag = wp( 'term', 'create', 'post_tag', 'summer', '--porcelain' );
 		wp( 'term', 'delete', 'post_tag', tag );
-		await page.goto( '/wp-admin/tools.php?page=category-tag-trash' );
+		await page.goto( '/wp-admin/tools.php?page=axle-category-tag-trash' );
 		await expect( page.locator( '#the-list tr' ) ).toHaveCount( 3 );
 		await shot( page, 2 );
 	} );
 
 	test( '3: what a restore brings back', async ( { page } ) => {
-		await page.goto( '/wp-admin/tools.php?page=category-tag-trash' );
+		await page.goto( '/wp-admin/tools.php?page=axle-category-tag-trash' );
 		const row = page.locator( '#the-list tr', { hasText: 'Recipes' } );
-		await row.locator( '.ctt-details summary' ).click();
+		await row.locator( '.actt-details summary' ).click();
 		await row.hover();
 		await shot( page, 3, { keepHover: true } );
 	} );

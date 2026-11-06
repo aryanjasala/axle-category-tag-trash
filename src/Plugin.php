@@ -111,7 +111,7 @@ final class Plugin {
 		}
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			\WP_CLI::add_command( 'category-tag-trash', new Command( $this->trash, $this->restorer, $this->purger ) );
+			\WP_CLI::add_command( 'axle-category-tag-trash', new Command( $this->trash, $this->restorer, $this->purger ) );
 		}
 	}
 }

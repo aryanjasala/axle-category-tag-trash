@@ -25,7 +25,7 @@ final class Restorer implements Service {
 	/**
 	 * Cron hook that re-attaches the next batch of objects.
 	 */
-	public const HOOK = 'category_tag_trash_restore_batch';
+	public const HOOK = 'axle_category_tag_trash_restore_batch';
 
 	/**
 	 * Seconds after which a background restore lock is treated as stale.
@@ -33,7 +33,7 @@ final class Restorer implements Service {
 	private const LOCK_TTL = 600;
 
 	/**
-	 * Object IDs passed to category_tag_trash_restored at most.
+	 * Object IDs passed to axle_category_tag_trash_restored at most.
 	 */
 	private const REPORTED_IDS = 5000;
 
@@ -78,7 +78,7 @@ final class Restorer implements Service {
 			if ( $snapshot && ! $this->trash->user_can_manage( $snapshot ) ) {
 				$result['errors'][] = sprintf(
 					/* translators: %s: term name. */
-					__( 'You are not allowed to restore "%s".', 'category-tag-trash' ),
+					__( 'You are not allowed to restore "%s".', 'axle-category-tag-trash' ),
 					$snapshot->name
 				);
 				continue;
@@ -109,7 +109,7 @@ final class Restorer implements Service {
 
 		$snapshot = $this->trash->get( $item_id );
 		if ( ! $snapshot ) {
-			return new \WP_Error( 'category_tag_trash_missing', __( 'That term is no longer in Category & Tag Trash.', 'category-tag-trash' ) );
+			return new \WP_Error( 'axle_category_tag_trash_missing', __( 'That term is no longer in Axle Category & Tag Trash.', 'axle-category-tag-trash' ) );
 		}
 
 		if ( $this->trash->is_restoring( $item_id ) ) {
@@ -117,16 +117,16 @@ final class Restorer implements Service {
 				return $this->finish_background( $item_id, $snapshot );
 			}
 			/* translators: %s: term name. */
-			return new \WP_Error( 'category_tag_trash_busy', sprintf( __( '"%s" is already being restored.', 'category-tag-trash' ), $snapshot->name ) );
+			return new \WP_Error( 'axle_category_tag_trash_busy', sprintf( __( '"%s" is already being restored.', 'axle-category-tag-trash' ), $snapshot->name ) );
 		}
 
 		$taxonomy = $snapshot->taxonomy;
 		if ( ! taxonomy_exists( $taxonomy ) ) {
 			return new \WP_Error(
-				'category_tag_trash_taxonomy',
+				'axle_category_tag_trash_taxonomy',
 				sprintf(
 					/* translators: %s: taxonomy name. */
-					__( 'The "%s" taxonomy is not registered, so this term cannot be restored. Activate the plugin or theme that adds it, then try again.', 'category-tag-trash' ),
+					__( 'The "%s" taxonomy is not registered, so this term cannot be restored. Activate the plugin or theme that adds it, then try again.', 'axle-category-tag-trash' ),
 					$taxonomy
 				)
 			);
@@ -137,7 +137,7 @@ final class Restorer implements Service {
 		if ( $parent && ! term_exists( $parent, $taxonomy ) ) {
 			$parent = 0;
 			/* translators: %s: term name. */
-			$notes[] = sprintf( __( '"%s" was restored at the top level because its parent no longer exists.', 'category-tag-trash' ), $snapshot->name );
+			$notes[] = sprintf( __( '"%s" was restored at the top level because its parent no longer exists.', 'axle-category-tag-trash' ), $snapshot->name );
 		}
 
 		$slug = $snapshot->slug;
@@ -150,7 +150,7 @@ final class Restorer implements Service {
 				)
 			);
 			/* translators: 1: term name, 2: new slug. */
-			$notes[] = sprintf( __( 'Another term now uses the slug of "%1$s", so it was restored as "%2$s".', 'category-tag-trash' ), $snapshot->name, $slug );
+			$notes[] = sprintf( __( 'Another term now uses the slug of "%1$s", so it was restored as "%2$s".', 'axle-category-tag-trash' ), $snapshot->name, $slug );
 		}
 
 		// Inserting directly is the only way to keep the original IDs.
@@ -165,13 +165,13 @@ final class Restorer implements Service {
 		}
 
 		if ( false === $wpdb->insert( $wpdb->terms, $term_row ) ) {
-			return new \WP_Error( 'category_tag_trash_db', __( 'The database refused to restore the term.', 'category-tag-trash' ) );
+			return new \WP_Error( 'axle_category_tag_trash_db', __( 'The database refused to restore the term.', 'axle-category-tag-trash' ) );
 		}
 
 		$term_id = $term_row['term_id'] ?? (int) $wpdb->insert_id;
 		if ( $term_id !== $snapshot->term_id ) {
 			/* translators: %s: term name. */
-			$notes[] = sprintf( __( '"%s" has a new ID because its old one was taken. Links that stored the old ID need updating.', 'category-tag-trash' ), $snapshot->name );
+			$notes[] = sprintf( __( '"%s" has a new ID because its old one was taken. Links that stored the old ID need updating.', 'axle-category-tag-trash' ), $snapshot->name );
 		}
 
 		$taxonomy_row = array(
@@ -187,7 +187,7 @@ final class Restorer implements Service {
 
 		if ( false === $wpdb->insert( $wpdb->term_taxonomy, $taxonomy_row ) ) {
 			$wpdb->delete( $wpdb->terms, array( 'term_id' => $term_id ) );
-			return new \WP_Error( 'category_tag_trash_db', __( 'The database refused to restore the term.', 'category-tag-trash' ) );
+			return new \WP_Error( 'axle_category_tag_trash_db', __( 'The database refused to restore the term.', 'axle-category-tag-trash' ) );
 		}
 		// phpcs:enable WordPress.DB.DirectDatabaseQuery
 
@@ -204,7 +204,7 @@ final class Restorer implements Service {
 		$this->restore_children( $snapshot, $term_id );
 		if ( $this->restore_menu_links( $snapshot, $term_id ) < count( $snapshot->menu_items ) ) {
 			/* translators: %s: term name. */
-			$notes[] = sprintf( __( 'Some menu links to "%s" were not restored because their menu no longer exists.', 'category-tag-trash' ), $snapshot->name );
+			$notes[] = sprintf( __( 'Some menu links to "%s" were not restored because their menu no longer exists.', 'axle-category-tag-trash' ), $snapshot->name );
 		}
 
 		$state = array(
@@ -222,18 +222,18 @@ final class Restorer implements Service {
 		do_action( 'created_term', $term_id, $tt_id, $taxonomy, array() );
 
 		/**
-		 * Fires after a term is restored from Category & Tag Trash.
+		 * Fires after a term is restored from Axle Category & Tag Trash.
 		 *
 		 * For a term with more objects than one batch, the rest are re-attached in
-		 * the background afterwards: category_tag_trash_objects_restored fires for every
-		 * batch and category_tag_trash_restore_complete once they are all back.
+		 * the background afterwards: axle_category_tag_trash_objects_restored fires for every
+		 * batch and axle_category_tag_trash_restore_complete once they are all back.
 		 *
 		 * @param int      $term_id    Restored term ID.
 		 * @param string   $taxonomy   Taxonomy name.
 		 * @param Snapshot $snapshot   What was saved when the term was deleted.
 		 * @param int[]    $object_ids Objects re-attached in this request, at most 5,000.
 		 */
-		do_action( 'category_tag_trash_restored', $term_id, $taxonomy, $snapshot, $object_ids );
+		do_action( 'axle_category_tag_trash_restored', $term_id, $taxonomy, $snapshot, $object_ids );
 
 		if ( $done ) {
 			$this->finish( $item_id, $snapshot, $state );
@@ -241,7 +241,7 @@ final class Restorer implements Service {
 			$this->defer( $item_id, $state );
 			$notes[] = sprintf(
 				/* translators: 1: term name, 2: number of posts or other items. */
-				__( '"%1$s" is back. Its %2$s items are being re-attached in the background.', 'category-tag-trash' ),
+				__( '"%1$s" is back. Its %2$s items are being re-attached in the background.', 'axle-category-tag-trash' ),
 				$snapshot->name,
 				number_format_i18n( $snapshot->total_objects() )
 			);
@@ -294,12 +294,12 @@ final class Restorer implements Service {
 	private function finish_background( int $item_id, Snapshot $snapshot ) {
 		$state = get_post_meta( $item_id, Trash::STATE_KEY, true );
 		if ( ! is_array( $state ) ) {
-			return new \WP_Error( 'category_tag_trash_state', __( 'The background restore lost its place. Delete the trash item and restore the term by hand.', 'category-tag-trash' ) );
+			return new \WP_Error( 'axle_category_tag_trash_state', __( 'The background restore lost its place. Delete the trash item and restore the term by hand.', 'axle-category-tag-trash' ) );
 		}
 
 		if ( ! $this->lock( $item_id ) ) {
 			/* translators: %s: term name. */
-			return new \WP_Error( 'category_tag_trash_busy', sprintf( __( '"%s" is being restored by another process right now.', 'category-tag-trash' ), $snapshot->name ) );
+			return new \WP_Error( 'axle_category_tag_trash_busy', sprintf( __( '"%s" is being restored by another process right now.', 'axle-category-tag-trash' ), $snapshot->name ) );
 		}
 
 		wp_clear_scheduled_hook( self::HOOK, array( $item_id ) );
@@ -326,7 +326,7 @@ final class Restorer implements Service {
 		 *
 		 * @param int $size Objects per batch. Default 5000.
 		 */
-		return max( Snapshot::CHUNK, (int) apply_filters( 'category_tag_trash_restore_batch_size', 5000 ) );
+		return max( Snapshot::CHUNK, (int) apply_filters( 'axle_category_tag_trash_restore_batch_size', 5000 ) );
 	}
 
 	/**
@@ -450,7 +450,7 @@ final class Restorer implements Service {
 		 * @param string $taxonomy   Taxonomy name.
 		 * @param int[]  $object_ids Objects in this batch.
 		 */
-		do_action( 'category_tag_trash_objects_restored', $term_id, $taxonomy, $ids );
+		do_action( 'axle_category_tag_trash_objects_restored', $term_id, $taxonomy, $ids );
 
 		return $ids;
 	}
@@ -543,7 +543,7 @@ final class Restorer implements Service {
 		 * @param string   $taxonomy Taxonomy name.
 		 * @param Snapshot $snapshot What was saved when the term was deleted.
 		 */
-		do_action( 'category_tag_trash_restore_complete', (int) $state['term_id'], $snapshot->taxonomy, $snapshot );
+		do_action( 'axle_category_tag_trash_restore_complete', (int) $state['term_id'], $snapshot->taxonomy, $snapshot );
 
 		$this->trash->remove( $item_id );
 	}
@@ -575,7 +575,7 @@ final class Restorer implements Service {
 	 * @return bool Whether the lock was taken.
 	 */
 	private function lock( int $item_id ): bool {
-		$name = 'category_tag_trash_lock_' . $item_id;
+		$name = 'axle_category_tag_trash_lock_' . $item_id;
 		if ( add_option( $name, time(), '', false ) ) {
 			return true;
 		}
@@ -594,7 +594,7 @@ final class Restorer implements Service {
 	 * @param int $item_id Trash item ID.
 	 */
 	private function unlock( int $item_id ): void {
-		delete_option( 'category_tag_trash_lock_' . $item_id );
+		delete_option( 'axle_category_tag_trash_lock_' . $item_id );
 	}
 
 	/**
