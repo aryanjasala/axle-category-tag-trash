@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<ruleset name="Category &amp; Tag Trash">
-	<description>WordPress coding standards for Category &amp; Tag Trash.</description>
+<ruleset name="Axle Category &amp; Tag Trash">
+	<description>WordPress coding standards for Axle Category &amp; Tag Trash.</description>
 
 	<file>.</file>
 	<exclude-pattern>/vendor/*</exclude-pattern>
@@ -24,7 +24,7 @@
 	<rule ref="WordPress.WP.I18n">
 		<properties>
 			<property name="text_domain" type="array">
-				<element value="category-tag-trash"/>
+				<element value="axle-category-tag-trash"/>
 			</property>
 		</properties>
 	</rule>
@@ -33,7 +33,7 @@
 		<properties>
 			<property name="prefixes" type="array">
 				<element value="AryanX\Axle\CategoryTagTrash"/>
-				<element value="category_tag_trash"/>
+				<element value="axle_category_tag_trash"/>
 			</property>
 		</properties>
 	</rule>

@@ -1,5 +1,5 @@
 {
-  "name": "aryanx/category-tag-trash",
+  "name": "aryanx/axle-category-tag-trash",
   "description": "A trash for WordPress categories, tags and custom terms, with undo and full restore.",
   "type": "wordpress-plugin",
   "license": "GPL-2.0-or-later",

@@ -1,7 +1,7 @@
 const path = require( 'path' );
 
 module.exports = {
-	SLUG: 'category-tag-trash',
+	SLUG: 'axle-category-tag-trash',
 	// Each plugin has its own port, so its site can run next to the others.
 	// WP_PORT moves it (start the site with the same WP_PORT), WP_BASE_URL points the tests elsewhere.
 	BASE_URL: process.env.WP_BASE_URL || `http://localhost:${ process.env.WP_PORT || 8910 }`,
@@ -12,5 +12,5 @@ module.exports = {
 	// This plugin's own Docker site by default. A shared site can be used by pointing WP_COMPOSE_DIR at its compose folder.
 	COMPOSE_DIR: process.env.WP_COMPOSE_DIR || path.join( __dirname, '..', 'env' ),
 	// Options the plugin stores, cleared before each run.
-	OPTIONS: ['category_tag_trash_settings'],
+	OPTIONS: ['axle_category_tag_trash_settings'],
 };

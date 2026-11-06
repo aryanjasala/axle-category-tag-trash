@@ -1,5 +1,5 @@
 /**
- * Category & Tag Trash: shows an Undo notice after a term is deleted from a term list.
+ * Axle Category & Tag Trash: shows an Undo notice after a term is deleted from a term list.
  *
  * Core deletes terms over admin-ajax (action "delete-tag") and answers "1" on
  * success. This listens for that response instead of replacing core's handler.
@@ -13,9 +13,9 @@
 		return template.replace( '%s', value );
 	}
 
-	// The "View Category & Tag Trash (N)" link under the table is rendered on page load, so keep it in step.
+	// The "View Axle Category & Tag Trash (N)" link under the table is rendered on page load, so keep it in step.
 	function bumpTrashCount() {
-		$( '.category-tag-trash-note a' ).text( function ( index, text ) {
+		$( '.axle-category-tag-trash-note a' ).text( function ( index, text ) {
 			return text.replace( /\((\d+)\)/, function ( match, count ) {
 				return '(' + ( Number( count ) + 1 ) + ')';
 			} );
@@ -23,12 +23,12 @@
 	}
 
 	function showNotice( termId, taxonomy, name ) {
-		var $notice = $( '<div class="notice notice-success is-dismissible category-tag-trash-undo"><p></p></div>' );
+		var $notice = $( '<div class="notice notice-success is-dismissible axle-category-tag-trash-undo"><p></p></div>' );
 		var $text = $( '<span></span>' ).text( format( settings.i18n.moved, name ) + ' ' );
 		var $button = $( '<button type="button" class="button button-small"></button>' ).text( settings.i18n.undo );
 
 		$notice.find( 'p' ).append( $text, $button );
-		$( '.category-tag-trash-undo' ).remove();
+		$( '.axle-category-tag-trash-undo' ).remove();
 		$( '.wp-header-end' ).first().after( $notice );
 		$( document ).trigger( 'wp-updates-notice-added' );
 		wp.a11y.speak( $text.text() );
@@ -74,4 +74,4 @@
 		showNotice( params.get( 'tag_ID' ), params.get( 'taxonomy' ), lastName );
 		bumpTrashCount();
 	} );
-} )( jQuery, window.categoryTagTrashScreen );
+} )( jQuery, window.axleCategoryTagTrashScreen );

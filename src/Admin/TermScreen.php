@@ -25,7 +25,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class TermScreen implements Service {
 
-	private const AJAX_UNDO = 'category_tag_trash_undo';
+	private const AJAX_UNDO = 'axle_category_tag_trash_undo';
 
 	/**
 	 * Trashed terms.
@@ -63,7 +63,7 @@ final class TermScreen implements Service {
 	}
 
 	/**
-	 * Adds the Category & Tag Trash link under each supported term list.
+	 * Adds the Axle Category & Tag Trash link under each supported term list.
 	 */
 	public function add_table_notes(): void {
 		foreach ( get_taxonomies( array( 'show_ui' => true ) ) as $taxonomy ) {
@@ -74,7 +74,7 @@ final class TermScreen implements Service {
 	}
 
 	/**
-	 * Prints a link to Category & Tag Trash below the terms table.
+	 * Prints a link to Axle Category & Tag Trash below the terms table.
 	 *
 	 * @param string $taxonomy Taxonomy of the screen.
 	 */
@@ -82,11 +82,11 @@ final class TermScreen implements Service {
 		$count = $this->trash->count_by_taxonomy()[ $taxonomy ] ?? 0;
 
 		printf(
-			'<p class="category-tag-trash-note description"><span class="dashicons dashicons-trash" aria-hidden="true"></span> %s <a href="%s">%s</a></p>',
+			'<p class="axle-category-tag-trash-note description"><span class="dashicons dashicons-trash" aria-hidden="true"></span> %s <a href="%s">%s</a></p>',
 			esc_html(
 				sprintf(
 					/* translators: %d: number of days. */
-					_n( 'Anything deleted here stays in Category & Tag Trash for %d day.', 'Anything deleted here stays in Category & Tag Trash for %d days.', $this->trash->settings()->retention_days(), 'category-tag-trash' ),
+					_n( 'Anything deleted here stays in Axle Category & Tag Trash for %d day.', 'Anything deleted here stays in Axle Category & Tag Trash for %d days.', $this->trash->settings()->retention_days(), 'axle-category-tag-trash' ),
 					$this->trash->settings()->retention_days()
 				)
 			),
@@ -94,7 +94,7 @@ final class TermScreen implements Service {
 			esc_html(
 				sprintf(
 					/* translators: %d: number of trashed terms. */
-					_n( 'View Category & Tag Trash (%d)', 'View Category & Tag Trash (%d)', $count, 'category-tag-trash' ),
+					_n( 'View Axle Category & Tag Trash (%d)', 'View Axle Category & Tag Trash (%d)', $count, 'axle-category-tag-trash' ),
 					$count
 				)
 			)
@@ -112,25 +112,25 @@ final class TermScreen implements Service {
 			return;
 		}
 
-		wp_enqueue_script( 'category-tag-trash-term-screen', plugins_url( 'assets/term-screen.js', PLUGIN_FILE ), array( 'jquery', 'wp-a11y' ), VERSION, true );
+		wp_enqueue_script( 'axle-category-tag-trash-term-screen', plugins_url( 'assets/term-screen.js', PLUGIN_FILE ), array( 'jquery', 'wp-a11y' ), VERSION, true );
 		wp_localize_script(
-			'category-tag-trash-term-screen',
-			'categoryTagTrashScreen',
+			'axle-category-tag-trash-term-screen',
+			'axleCategoryTagTrashScreen',
 			array(
 				'action' => self::AJAX_UNDO,
 				'nonce'  => wp_create_nonce( self::AJAX_UNDO ),
 				'i18n'   => array(
 					/* translators: %s: term name. */
-					'moved'     => __( '"%s" moved to Category & Tag Trash.', 'category-tag-trash' ),
-					'undo'      => __( 'Undo', 'category-tag-trash' ),
-					'restoring' => __( 'Restoring…', 'category-tag-trash' ),
+					'moved'     => __( '"%s" moved to Axle Category & Tag Trash.', 'axle-category-tag-trash' ),
+					'undo'      => __( 'Undo', 'axle-category-tag-trash' ),
+					'restoring' => __( 'Restoring…', 'axle-category-tag-trash' ),
 					/* translators: %s: term name. */
-					'restored'  => __( '"%s" restored.', 'category-tag-trash' ),
-					'failed'    => __( 'Could not restore the term.', 'category-tag-trash' ),
+					'restored'  => __( '"%s" restored.', 'axle-category-tag-trash' ),
+					'failed'    => __( 'Could not restore the term.', 'axle-category-tag-trash' ),
 				),
 			)
 		);
-		wp_enqueue_style( 'category-tag-trash-admin', plugins_url( 'assets/admin.css', PLUGIN_FILE ), array(), VERSION );
+		wp_enqueue_style( 'axle-category-tag-trash-admin', plugins_url( 'assets/admin.css', PLUGIN_FILE ), array(), VERSION );
 	}
 
 	/**
@@ -145,11 +145,11 @@ final class TermScreen implements Service {
 		$snapshot = $item_id ? $this->trash->get( $item_id ) : null;
 
 		if ( ! $snapshot ) {
-			wp_send_json_error( array( 'message' => __( 'That term is no longer in Category & Tag Trash.', 'category-tag-trash' ) ), 404 );
+			wp_send_json_error( array( 'message' => __( 'That term is no longer in Axle Category & Tag Trash.', 'axle-category-tag-trash' ) ), 404 );
 		}
 
 		if ( ! $this->trash->user_can_manage( $snapshot ) ) {
-			wp_send_json_error( array( 'message' => __( 'Sorry, you are not allowed to restore this term.', 'category-tag-trash' ) ), 403 );
+			wp_send_json_error( array( 'message' => __( 'Sorry, you are not allowed to restore this term.', 'axle-category-tag-trash' ) ), 403 );
 		}
 
 		$result = $this->restorer->restore( $item_id );
@@ -180,8 +180,8 @@ final class TermScreen implements Service {
 		delete_transient( Snapshotter::undo_key( $user_id ) );
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Display-only values set by our own redirect.
-		$restored = isset( $_GET['ctt_restored'] ) ? array_filter( array_map( 'absint', explode( ',', sanitize_text_field( wp_unslash( $_GET['ctt_restored'] ) ) ) ) ) : array();
-		$notes    = isset( $_GET['ctt_notes'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_GET['ctt_notes'] ) ) : array();
+		$restored = isset( $_GET['actt_restored'] ) ? array_filter( array_map( 'absint', explode( ',', sanitize_text_field( wp_unslash( $_GET['actt_restored'] ) ) ) ) ) : array();
+		$notes    = isset( $_GET['actt_notes'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_GET['actt_notes'] ) ) : array();
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 		TrashPage::print_restored_notice( $restored, $notes );
 
@@ -195,16 +195,16 @@ final class TermScreen implements Service {
 		}
 
 		printf(
-			'<div class="notice notice-success is-dismissible category-tag-trash-undo"><p>%s <a href="%s" class="button button-small">%s</a></p></div>',
+			'<div class="notice notice-success is-dismissible axle-category-tag-trash-undo"><p>%s <a href="%s" class="button button-small">%s</a></p></div>',
 			esc_html(
 				sprintf(
 					/* translators: %d: number of terms. */
-					_n( '%d term moved to Category & Tag Trash.', '%d terms moved to Category & Tag Trash.', count( $item_ids ), 'category-tag-trash' ),
+					_n( '%d term moved to Axle Category & Tag Trash.', '%d terms moved to Axle Category & Tag Trash.', count( $item_ids ), 'axle-category-tag-trash' ),
 					count( $item_ids )
 				)
 			),
 			esc_url( TrashPage::action_url( 'restore', $item_ids, $back ) ),
-			esc_html__( 'Undo', 'category-tag-trash' )
+			esc_html__( 'Undo', 'axle-category-tag-trash' )
 		);
 	}
 }

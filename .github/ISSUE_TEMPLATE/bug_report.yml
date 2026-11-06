@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Category & Tag Trash does not work the way the docs say.
+description: Something in Axle Category & Tag Trash does not work the way the docs say.
 labels: [bug]
 body:
   - type: textarea
@@ -22,7 +22,7 @@ body:
   - type: input
     id: plugin
     attributes:
-      label: Category & Tag Trash version
+      label: Axle Category & Tag Trash version
       placeholder: "1.1.0"
     validations:
       required: true

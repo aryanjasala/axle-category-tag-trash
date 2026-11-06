@@ -119,12 +119,12 @@ final class CategoryTagTrashTest extends TestCase {
 		$this->options[ Settings::OPTION ] = array( 'retention_days' => 90 );
 		$this->assertSame( 90, ( new Settings() )->retention_days() );
 
-		Filters\expectApplied( 'category_tag_trash_retention_days' )->once()->with( 90 )->andReturn( 7 );
+		Filters\expectApplied( 'axle_category_tag_trash_retention_days' )->once()->with( 90 )->andReturn( 7 );
 		$this->assertSame( 7, ( new Settings() )->retention_days() );
 	}
 
 	public function test_retention_choices_can_be_filtered_and_are_cleaned(): void {
-		Filters\expectApplied( 'category_tag_trash_retention_choices' )->andReturn( array( 180, 0, 14, 14, 'x' ) );
+		Filters\expectApplied( 'axle_category_tag_trash_retention_choices' )->andReturn( array( 180, 0, 14, 14, 'x' ) );
 
 		$this->assertSame( array( 14, 180 ), Settings::retention_choices() );
 

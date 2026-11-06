@@ -1,5 +1,5 @@
 {
-  "name": "category-tag-trash",
+  "name": "axle-category-tag-trash",
   "private": true,
   "description": "A trash for WordPress categories, tags and custom terms, with undo and full restore.",
   "license": "GPL-2.0-or-later",
