@@ -43,7 +43,7 @@
 	vertical-align: baseline;
 }
 
-/* Core's red delete link is 4.4:1 on a striped row in WordPress before 7.0. */
-.ctt-page .row-actions .submitdelete {
+/* The shared danger button text (#d63638) is 4.4:1 on core's button background before WordPress 7.0. */
+.ctt-page .button.axle-button--danger {
 	color: var(--axle-error-text);
 }
