@@ -22,7 +22,7 @@
 
 .ctt-details summary {
 	cursor: pointer;
-	color: var(--wp-admin-theme-color, #2271b1);
+	color: var(--wp-admin-theme-color-darker-10, #135e96);
 }
 
 .ctt-details p {
