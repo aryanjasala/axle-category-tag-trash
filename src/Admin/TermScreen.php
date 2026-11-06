@@ -82,7 +82,7 @@ final class TermScreen implements Service {
 		$count = $this->trash->count_by_taxonomy()[ $taxonomy ] ?? 0;
 
 		printf(
-			'<p class="category-tag-trash-note"><span class="dashicons dashicons-trash" aria-hidden="true"></span> %s <a href="%s">%s</a></p>',
+			'<p class="category-tag-trash-note description"><span class="dashicons dashicons-trash" aria-hidden="true"></span> %s <a href="%s">%s</a></p>',
 			esc_html(
 				sprintf(
 					/* translators: %d: number of days. */

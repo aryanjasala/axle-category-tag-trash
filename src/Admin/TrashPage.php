@@ -132,7 +132,8 @@ final class TrashPage implements Service {
 	 * Screen styles.
 	 */
 	public function enqueue_styles(): void {
-		wp_enqueue_style( 'category-tag-trash-admin', plugins_url( 'assets/admin.css', PLUGIN_FILE ), array(), VERSION );
+		AxleUi::enqueue();
+		wp_enqueue_style( 'category-tag-trash-admin', plugins_url( 'assets/admin.css', PLUGIN_FILE ), array( AxleUi::HANDLE ), VERSION );
 	}
 
 	/**
@@ -143,47 +144,74 @@ final class TrashPage implements Service {
 
 		$table = new TrashListTable( $this->trash );
 		$table->prepare_items();
-		$days = $this->trash->settings()->retention_days();
+		$days  = $this->trash->settings()->retention_days();
+		$total = array_sum( $this->trash->count_by_taxonomy() );
 		?>
-		<div class="wrap ctt-page">
+		<div class="wrap axle-ui ctt-page">
 			<h1 class="wp-heading-inline"><?php esc_html_e( 'Category & Tag Trash', 'category-tag-trash' ); ?></h1>
-			<?php if ( $table->has_items() ) : ?>
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="ctt-inline">
-					<?php wp_nonce_field( self::ACTION . '_empty' ); ?>
-					<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION ); ?>">
-					<input type="hidden" name="task" value="empty">
-					<button type="submit" class="page-title-action ctt-empty" onclick="return window.confirm( '<?php echo esc_js( __( 'Delete everything in Category & Tag Trash for good? This cannot be undone.', 'category-tag-trash' ) ); ?>' );"><?php esc_html_e( 'Empty trash', 'category-tag-trash' ); ?></button>
-				</form>
-			<?php endif; ?>
 			<hr class="wp-header-end">
 
 			<?php $this->render_notices(); ?>
 
-			<div class="ctt-intro">
-				<p>
-					<?php
-					echo esc_html(
-						sprintf(
-							/* translators: %d: number of days. */
-							_n( 'Deleted categories, tags and other terms are kept here for %d day, then deleted for good.', 'Deleted categories, tags and other terms are kept here for %d days, then deleted for good.', $days, 'category-tag-trash' ),
-							$days
-						)
-					);
-					?>
-				</p>
-				<?php $this->render_retention_form( $days ); ?>
-			</div>
+			<p class="axle-intro ctt-intro">
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: %d: number of days. */
+						_n( 'Deleted categories, tags and other terms are kept here for %d day, then deleted for good.', 'Deleted categories, tags and other terms are kept here for %d days, then deleted for good.', $days, 'category-tag-trash' ),
+						$days
+					)
+				);
+				?>
+			</p>
 
-			<?php $table->views(); ?>
-			<form method="get">
-				<input type="hidden" name="page" value="<?php echo esc_attr( self::SLUG ); ?>">
-				<?php if ( $table->current_taxonomy() ) : ?>
-					<input type="hidden" name="taxonomy" value="<?php echo esc_attr( $table->current_taxonomy() ); ?>">
-				<?php endif; ?>
-				<?php $table->search_box( __( 'Search trash', 'category-tag-trash' ), 'category-tag-trash' ); ?>
-				<?php $table->display(); ?>
-			</form>
+			<?php if ( $total || $table->has_items() ) : ?>
+				<?php $table->views(); ?>
+				<form method="get">
+					<input type="hidden" name="page" value="<?php echo esc_attr( self::SLUG ); ?>">
+					<?php if ( $table->current_taxonomy() ) : ?>
+						<input type="hidden" name="taxonomy" value="<?php echo esc_attr( $table->current_taxonomy() ); ?>">
+					<?php endif; ?>
+					<?php $table->search_box( __( 'Search trash', 'category-tag-trash' ), 'category-tag-trash' ); ?>
+					<?php $table->display(); ?>
+				</form>
+			<?php else : ?>
+				<div class="axle-empty">
+					<p><?php esc_html_e( 'Category & Tag Trash is empty.', 'category-tag-trash' ); ?></p>
+					<p><?php esc_html_e( 'Categories, tags and other terms you delete will show up here, so you can restore them.', 'category-tag-trash' ); ?></p>
+				</div>
+			<?php endif; ?>
+
+			<?php $this->render_retention_form( $days ); ?>
+			<?php $this->render_empty_card( $table->has_items() ); ?>
+
+			<?php AxleUi::footer(); ?>
 		</div>
+		<?php
+	}
+
+	/**
+	 * Prints the danger card with Empty trash.
+	 *
+	 * @param bool $show Whether there is anything to empty.
+	 */
+	private function render_empty_card( bool $show ): void {
+		if ( ! $show ) {
+			return;
+		}
+
+		$confirm = __( 'Delete everything in Category & Tag Trash that you can manage, for good? This cannot be undone.', 'category-tag-trash' );
+		?>
+		<section class="axle-card axle-card--danger">
+			<h2 class="axle-card__title"><?php esc_html_e( 'Empty the trash', 'category-tag-trash' ); ?></h2>
+			<p><?php esc_html_e( 'Deletes every term in the trash that you can manage, for good. Restore can no longer bring them back. This cannot be undone.', 'category-tag-trash' ); ?></p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( self::ACTION . '_empty' ); ?>
+				<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION ); ?>">
+				<input type="hidden" name="task" value="empty">
+				<button type="submit" class="button axle-button--danger" onclick="return window.confirm( '<?php echo esc_js( $confirm ); ?>' );"><?php esc_html_e( 'Empty trash', 'category-tag-trash' ); ?></button>
+			</form>
+		</section>
 		<?php
 	}
 
@@ -197,23 +225,33 @@ final class TrashPage implements Service {
 			return;
 		}
 		?>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="ctt-retention">
-			<?php wp_nonce_field( self::ACTION . '_settings' ); ?>
-			<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION ); ?>">
-			<input type="hidden" name="task" value="settings">
-			<label for="ctt-retention"><?php esc_html_e( 'Keep deleted terms for', 'category-tag-trash' ); ?></label>
-			<select id="ctt-retention" name="retention_days">
-				<?php foreach ( Settings::retention_choices() as $option ) : ?>
-					<option value="<?php echo esc_attr( (string) $option ); ?>" <?php selected( $days, $option ); ?>>
-						<?php
-						/* translators: %d: number of days. */
-						echo esc_html( sprintf( _n( '%d day', '%d days', $option, 'category-tag-trash' ), $option ) );
-						?>
-					</option>
-				<?php endforeach; ?>
-			</select>
-			<button type="submit" class="button"><?php esc_html_e( 'Save', 'category-tag-trash' ); ?></button>
-		</form>
+		<section class="axle-card">
+			<h2 class="axle-card__title"><?php esc_html_e( 'Retention', 'category-tag-trash' ); ?></h2>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( self::ACTION . '_settings' ); ?>
+				<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION ); ?>">
+				<input type="hidden" name="task" value="settings">
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="ctt-retention"><?php esc_html_e( 'Keep deleted terms for', 'category-tag-trash' ); ?></label></th>
+						<td>
+							<select id="ctt-retention" name="retention_days">
+								<?php foreach ( Settings::retention_choices() as $option ) : ?>
+									<option value="<?php echo esc_attr( (string) $option ); ?>" <?php selected( $days, $option ); ?>>
+										<?php
+										/* translators: %d: number of days. */
+										echo esc_html( sprintf( _n( '%d day', '%d days', $option, 'category-tag-trash' ), $option ) );
+										?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+							<p class="description"><?php esc_html_e( 'After this time a term is deleted for good and can no longer be restored.', 'category-tag-trash' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<p class="submit"><button type="submit" class="button button-primary"><?php esc_html_e( 'Save retention', 'category-tag-trash' ); ?></button></p>
+			</form>
+		</section>
 		<?php
 	}
 

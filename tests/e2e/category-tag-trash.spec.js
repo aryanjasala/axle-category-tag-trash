@@ -123,7 +123,7 @@ test.describe( 'Category & Tag Trash', () => {
 		await page.locator( '#bulk-action-selector-top' ).selectOption( 'restore' );
 		await page.locator( '#doaction' ).click();
 		await expect( page.locator( '.ctt-restored' ) ).toContainText( 'Batch A' );
-		await expect( page.locator( '#the-list' ) ).toContainText( 'Category & Tag Trash is empty.' );
+		await expect( page.locator( '.axle-empty' ) ).toContainText( 'Category & Tag Trash is empty.' );
 
 		for ( const slug of [ 'batch-a', 'batch-b', 'batch-c' ] ) {
 			wp( 'term', 'delete', 'post_tag', wp( 'term', 'get', 'post_tag', slug, '--by=slug', '--field=term_id' ) );
@@ -147,7 +147,7 @@ test.describe( 'Category & Tag Trash', () => {
 		await expect( page.getByRole( 'button', { name: 'Empty trash' } ) ).toHaveCount( 0 );
 
 		await page.locator( '#ctt-retention' ).selectOption( '90' );
-		await page.getByRole( 'button', { name: 'Save', exact: true } ).click();
+		await page.getByRole( 'button', { name: 'Save retention' } ).click();
 		await expect( page.locator( '.notice-success' ) ).toContainText( 'Settings saved.' );
 		await expect( page.locator( '.ctt-intro' ) ).toContainText( 'kept here for 90 days' );
 		wp( 'option', 'delete', 'category_tag_trash_settings' );
