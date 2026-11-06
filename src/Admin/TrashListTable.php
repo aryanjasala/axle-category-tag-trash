@@ -220,7 +220,7 @@ final class TrashListTable extends \WP_List_Table {
 		$object   = get_taxonomy( $snapshot->taxonomy );
 
 		if ( ! $object ) {
-			return sprintf( '%s<br><span class="ctt-warning">%s</span>', esc_html( $snapshot->taxonomy ), esc_html__( 'Not registered, so it cannot be restored', 'category-tag-trash' ) );
+			return sprintf( '%s<br><span class="axle-badge axle-badge--warning">%s</span>', esc_html( $snapshot->taxonomy ), esc_html__( 'Not registered, so it cannot be restored', 'category-tag-trash' ) );
 		}
 
 		return esc_html( $object->labels->singular_name );
@@ -250,7 +250,7 @@ final class TrashListTable extends \WP_List_Table {
 		$time    = (int) get_post_time( 'U', true, $post );
 
 		return sprintf(
-			'<span title="%s">%s</span><br><span class="ctt-muted">%s</span>',
+			'<span title="%s">%s</span><br><span class="axle-muted">%s</span>',
 			esc_attr( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $time ) ),
 			/* translators: %s: time ago, e.g. "5 mins". */
 			esc_html( sprintf( __( '%s ago', 'category-tag-trash' ), human_time_diff( $time ) ) ),
