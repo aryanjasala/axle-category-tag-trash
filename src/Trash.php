@@ -21,6 +21,8 @@ final class Trash implements Service {
 	public const OBJECTS_KEY  = '_axle_category_tag_trash_objects';
 	public const FALLBACK_KEY = '_axle_category_tag_trash_fallback';
 	public const STATE_KEY    = '_axle_category_tag_trash_restore_state';
+	public const GAINED_KEY   = '_axle_category_tag_trash_merge_gained';
+	public const MERGE_KEY    = '_axle_category_tag_trash_merge';
 
 	/**
 	 * Post status of an item in the trash.
@@ -31,6 +33,11 @@ final class Trash implements Service {
 	 * Post status of an item whose objects are being re-attached in the background.
 	 */
 	public const STATUS_RESTORING = 'pending';
+
+	/**
+	 * Post status of a merge that is still moving objects to the target term.
+	 */
+	public const STATUS_MERGING = 'draft';
 
 	/**
 	 * Most items find() returns at once.
@@ -163,6 +170,9 @@ final class Trash implements Service {
 		global $wpdb;
 
 		if ( ! $this->chunk_count( $item_id, $key ) ) {
+			if ( self::GAINED_KEY === $key ) {
+				return array();
+			}
 			// Saved by 1.1.0 or earlier, with the objects inside the snapshot.
 			$legacy = self::OBJECTS_KEY === $key ? $snapshot->legacy_object_chunks() : $snapshot->legacy_fallback_chunks();
 			return array_slice( $legacy, $offset, $limit );
@@ -228,7 +238,8 @@ final class Trash implements Service {
 	 * @param array $args {
 	 *     Optional filters.
 	 *
-	 *     @type string $taxonomy Only this taxonomy.
+	 *     @type string   $taxonomy   Only this taxonomy.
+	 *     @type string[] $taxonomies Only these taxonomies. An empty array finds nothing.
 	 *     @type int    $term_id  Only this original term ID.
 	 *     @type string $search   Name contains this text.
 	 *     @type int    $per_page Items per page, at most MAX_PER_PAGE. Default 100.
@@ -237,7 +248,21 @@ final class Trash implements Service {
 	 * @return array{ids: int[], total: int}
 	 */
 	public function find( array $args = array() ): array {
+		if ( isset( $args['taxonomies'] ) && ! array_filter( (array) $args['taxonomies'] ) ) {
+			return array(
+				'ids'   => array(),
+				'total' => 0,
+			);
+		}
+
 		$meta_query = array();
+		if ( ! empty( $args['taxonomies'] ) ) {
+			$meta_query[] = array(
+				'key'     => self::TAXONOMY_KEY,
+				'value'   => array_values( array_map( 'strval', (array) $args['taxonomies'] ) ),
+				'compare' => 'IN',
+			);
+		}
 		if ( ! empty( $args['taxonomy'] ) ) {
 			$meta_query[] = array(
 				'key'   => self::TAXONOMY_KEY,
@@ -278,9 +303,10 @@ final class Trash implements Service {
 	/**
 	 * Number of trashed terms per taxonomy.
 	 *
+	 * @param string|null $context Only taxonomies the current user may use for this kind of access, see Access. Null counts them all.
 	 * @return array<string, int>
 	 */
-	public function count_by_taxonomy(): array {
+	public function count_by_taxonomy( ?string $context = null ): array {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Grouped count, no API for it.
@@ -300,7 +326,21 @@ final class Trash implements Service {
 			$counts[ $row->taxonomy ] = (int) $row->total;
 		}
 
+		if ( null !== $context ) {
+			$counts = array_intersect_key( $counts, array_flip( Access::filter( array_keys( $counts ), $context ) ) );
+		}
+
 		return $counts;
+	}
+
+	/**
+	 * Taxonomies that have trashed terms and that the current user may use.
+	 *
+	 * @param string $context Access::LIST, RESTORE, DELETE or MERGE.
+	 * @return string[]
+	 */
+	public function accessible_taxonomies( string $context = Access::LIST ): array {
+		return array_keys( $this->count_by_taxonomy( $context ) );
 	}
 
 	/**
@@ -357,14 +397,27 @@ final class Trash implements Service {
 	}
 
 	/**
-	 * Whether the current user may restore or delete a trashed term.
+	 * Whether the current user may see, restore or delete a trashed term.
+	 *
+	 * Asks the capabilities of the term's own taxonomy, see Access.
 	 *
 	 * @param Snapshot $snapshot Trashed term.
+	 * @param string   $context  Access::LIST, RESTORE or DELETE.
 	 * @return bool
 	 */
-	public function user_can_manage( Snapshot $snapshot ): bool {
-		$taxonomy = get_taxonomy( $snapshot->taxonomy );
+	public function user_can_manage( Snapshot $snapshot, string $context = Access::LIST ): bool {
+		return Access::can( $snapshot->taxonomy, $context );
+	}
 
-		return $taxonomy ? current_user_can( $taxonomy->cap->manage_terms ) : current_user_can( 'manage_options' );
+	/**
+	 * The merge saved with a trash item, when the term was merged into another.
+	 *
+	 * @param int $item_id Trash item ID.
+	 * @return array{target_id: int, target_tt_id: int, target_name: string, target_slug: string, moved: int, reparented: array, menu_items: int[], merged_at: int}|null
+	 */
+	public function merge_info( int $item_id ): ?array {
+		$info = get_post_meta( $item_id, self::MERGE_KEY, true );
+
+		return is_array( $info ) && ! empty( $info['target_id'] ) ? $info : null;
 	}
 }

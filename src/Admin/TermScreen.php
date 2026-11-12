@@ -7,6 +7,8 @@
 
 namespace AryanX\Axle\CategoryTagTrash\Admin;
 
+use AryanX\Axle\CategoryTagTrash\Access;
+use AryanX\Axle\CategoryTagTrash\Merger;
 use AryanX\Axle\CategoryTagTrash\Restorer;
 use AryanX\Axle\CategoryTagTrash\Service;
 use AryanX\Axle\CategoryTagTrash\Snapshotter;
@@ -63,14 +65,88 @@ final class TermScreen implements Service {
 	}
 
 	/**
-	 * Adds the Axle Category & Tag Trash link under each supported term list.
+	 * Adds the Axle Category & Tag Trash link, and the merge actions, to each supported term list.
 	 */
 	public function add_table_notes(): void {
 		foreach ( get_taxonomies( array( 'show_ui' => true ) ) as $taxonomy ) {
 			if ( $this->trash->supports( $taxonomy ) ) {
 				add_action( "after-{$taxonomy}-table", array( $this, 'table_note' ) );
+				add_filter( "{$taxonomy}_row_actions", array( $this, 'row_actions' ), 10, 2 );
+				add_filter( "bulk_actions-edit-{$taxonomy}", array( $this, 'bulk_actions' ) );
+				add_filter( "handle_bulk_actions-edit-{$taxonomy}", array( $this, 'handle_bulk_merge' ), 10, 3 );
 			}
 		}
+	}
+
+	/**
+	 * Whether the current user may start a merge from a term of a taxonomy.
+	 *
+	 * @param string $taxonomy Taxonomy name.
+	 * @return bool
+	 */
+	private function can_merge_in( string $taxonomy ): bool {
+		return current_user_can( TrashPage::capability() ) && Access::can( $taxonomy, Access::MERGE );
+	}
+
+	/**
+	 * Adds "Merge into…" to a term's row actions.
+	 *
+	 * @param array $actions Row actions.
+	 * @param mixed $term    The term.
+	 * @return array
+	 */
+	public function row_actions( $actions, $term ): array {
+		$actions = (array) $actions;
+
+		if ( $term instanceof \WP_Term && $this->can_merge_in( $term->taxonomy ) && current_user_can( 'delete_term', $term->term_id ) && ! Merger::is_default_term( $term ) ) {
+			$actions['axle_merge'] = sprintf(
+				'<a href="%s" aria-label="%s">%s</a>',
+				esc_url( TrashPage::merge_url( $term->taxonomy, array( (int) $term->term_id ) ) ),
+				/* translators: %s: term name. */
+				esc_attr( sprintf( __( 'Merge "%s" into another term', 'axle-category-tag-trash' ), $term->name ) ),
+				esc_html__( 'Merge into…', 'axle-category-tag-trash' )
+			);
+		}
+
+		return $actions;
+	}
+
+	/**
+	 * Adds "Merge into…" to the bulk actions.
+	 *
+	 * @param array $actions Bulk actions.
+	 * @return array
+	 */
+	public function bulk_actions( $actions ): array {
+		$actions = (array) $actions;
+		$screen  = get_current_screen();
+
+		if ( $screen && $this->can_merge_in( (string) $screen->taxonomy ) ) {
+			$actions['axle_merge'] = __( 'Merge into…', 'axle-category-tag-trash' );
+		}
+
+		return $actions;
+	}
+
+	/**
+	 * Sends the selected terms to the merge screen. Core has already checked the bulk nonce.
+	 *
+	 * @param string $location Where core redirects to.
+	 * @param string $action   The bulk action.
+	 * @param array  $term_ids Selected term IDs.
+	 * @return string
+	 */
+	public function handle_bulk_merge( $location, $action, $term_ids ): string {
+		$location = (string) $location;
+		$screen   = get_current_screen();
+
+		if ( 'axle_merge' !== $action || ! $screen || ! $this->can_merge_in( (string) $screen->taxonomy ) ) {
+			return $location;
+		}
+
+		$term_ids = array_values( array_filter( array_map( 'absint', (array) $term_ids ) ) );
+
+		return $term_ids ? TrashPage::merge_url( (string) $screen->taxonomy, $term_ids ) : $location;
 	}
 
 	/**
@@ -79,6 +155,10 @@ final class TermScreen implements Service {
 	 * @param string $taxonomy Taxonomy of the screen.
 	 */
 	public function table_note( string $taxonomy ): void {
+		if ( ! current_user_can( TrashPage::capability() ) || ! Access::can( $taxonomy, Access::LIST ) ) {
+			return;
+		}
+
 		$count = $this->trash->count_by_taxonomy()[ $taxonomy ] ?? 0;
 
 		printf(
@@ -127,6 +207,7 @@ final class TermScreen implements Service {
 					/* translators: %s: term name. */
 					'restored'  => __( '"%s" restored.', 'axle-category-tag-trash' ),
 					'failed'    => __( 'Could not restore the term.', 'axle-category-tag-trash' ),
+					'retry'     => __( 'Open the trash and restore it from there.', 'axle-category-tag-trash' ),
 				),
 			)
 		);
@@ -148,7 +229,7 @@ final class TermScreen implements Service {
 			wp_send_json_error( array( 'message' => __( 'That term is no longer in Axle Category & Tag Trash.', 'axle-category-tag-trash' ) ), 404 );
 		}
 
-		if ( ! $this->trash->user_can_manage( $snapshot ) ) {
+		if ( ! $this->trash->user_can_manage( $snapshot, Access::RESTORE ) ) {
 			wp_send_json_error( array( 'message' => __( 'Sorry, you are not allowed to restore this term.', 'axle-category-tag-trash' ) ), 403 );
 		}
 

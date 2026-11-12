@@ -110,6 +110,27 @@ test.describe( 'Axle Category & Tag Trash', () => {
 		expectFullyRestored( ids, 'Screen' );
 	} );
 
+	test( 'the screen has Help tabs, a link on the Plugins screen and times that read "ago"', async ( { page } ) => {
+		const tag = wp( 'term', 'create', 'post_tag', 'Help tag', '--porcelain' );
+		wp( 'term', 'delete', 'post_tag', tag );
+
+		await page.goto( '/wp-admin/plugins.php' );
+		await page.locator( '#the-list tr[data-slug="axle-category-tag-trash"] .row-actions' ).getByRole( 'link', { name: 'Open the trash' } ).click();
+		await expect( page ).toHaveURL( /page=axle-category-tag-trash/ );
+		await expect( page.getByRole( 'heading', { level: 1 } ) ).toHaveText( 'Category & Tag Trash' );
+
+		await expect( page.locator( '.axle-time' ).first() ).toHaveText( /Just now|minute/ );
+		await expect( page.locator( '.axle-time' ).first() ).toHaveAttribute( 'datetime', /T/ );
+
+		await page.locator( '#contextual-help-link' ).click();
+		const tabs = page.locator( '#contextual-help-wrap .contextual-help-tabs' );
+		for ( const title of [ 'Overview', 'Restoring', 'Merging', 'Retention and emptying' ] ) {
+			await expect( tabs.locator( 'a', { hasText: title } ) ).toBeVisible();
+		}
+		await tabs.locator( 'a', { hasText: 'Merging' } ).click();
+		await expect( page.locator( '#tab-panel-axle-category-tag-trash-merging' ) ).toContainText( 'Undo merge' );
+	} );
+
 	test( 'bulk restore, delete permanently, empty trash and the retention setting', async ( { page } ) => {
 		const make = ( names ) =>
 			names.forEach( ( name ) => {
@@ -123,48 +144,49 @@ test.describe( 'Axle Category & Tag Trash', () => {
 		await page.locator( '#bulk-action-selector-top' ).selectOption( 'restore' );
 		await page.locator( '#doaction' ).click();
 		await expect( page.locator( '.actt-restored' ) ).toContainText( 'Batch A' );
-		await expect( page.locator( '.axle-empty' ) ).toContainText( 'Axle Category & Tag Trash is empty.' );
+		await expect( page.locator( '.axle-empty' ) ).toContainText( 'The trash is empty.' );
 
 		for ( const slug of [ 'batch-a', 'batch-b', 'batch-c' ] ) {
 			wp( 'term', 'delete', 'post_tag', wp( 'term', 'get', 'post_tag', slug, '--by=slug', '--field=term_id' ) );
 		}
 		await page.goto( TRASH );
 
-		// Deleting one row asks first; saying no keeps it.
+		// Deleting one row asks first, in place; saying no keeps it.
 		const batchA = page.locator( 'tr', { hasText: 'Batch A' } );
-		let asked = '';
-		page.once( 'dialog', ( dialog ) => {
-			asked = dialog.message();
-			dialog.dismiss();
-		} );
 		await batchA.hover();
 		await batchA.getByRole( 'link', { name: 'Delete permanently' } ).click();
-		await expect.poll( () => asked ).toContain( 'Delete "Batch A" for good?' );
-		expect( asked ).toContain( 'cannot be undone' );
+		const rowConfirm = batchA.locator( '.actt-row-confirm' );
+		await expect( rowConfirm ).toContainText( 'Delete "Batch A" for good?' );
+		await expect( rowConfirm ).toContainText( 'cannot be undone' );
+		await expect( rowConfirm.getByRole( 'link', { name: 'Delete permanently' } ) ).toBeFocused();
+		await rowConfirm.getByRole( 'button', { name: 'Cancel' } ).click();
+		await expect( rowConfirm ).toHaveCount( 0 );
 		await expect( batchA ).toHaveCount( 1 );
+
+		// Escape closes it too, and focus goes back to the link.
+		await batchA.getByRole( 'link', { name: 'Delete permanently' } ).click();
+		await page.keyboard.press( 'Escape' );
+		await expect( batchA.locator( '.actt-row-confirm' ) ).toHaveCount( 0 );
+		await expect( batchA.getByRole( 'link', { name: 'Delete permanently' } ) ).toBeFocused();
 
 		// The bulk delete asks too; saying yes deletes all three.
 		await page.locator( '#cb-select-all-1' ).check();
 		await page.locator( '#bulk-action-selector-top' ).selectOption( 'delete' );
-		asked = '';
-		page.once( 'dialog', ( dialog ) => {
-			asked = dialog.message();
-			dialog.accept();
-		} );
 		await page.locator( '#doaction' ).click();
+		const bulkConfirm = page.locator( '#actt-bulk-confirm' );
+		await expect( bulkConfirm ).toBeVisible();
+		await expect( bulkConfirm ).toContainText( 'Delete the selected terms for good?' );
+		await bulkConfirm.getByRole( 'button', { name: 'Delete selected terms for good' } ).click();
 		await expect( page.locator( '.notice-success' ) ).toContainText( '3 terms deleted for good.' );
-		expect( asked ).toContain( 'Delete the selected terms for good?' );
 
 		make( [ 'Batch D' ] );
 		await page.goto( TRASH );
-		let confirmed = '';
-		page.once( 'dialog', ( dialog ) => {
-			confirmed = dialog.message();
-			dialog.accept();
-		} );
 		await page.getByRole( 'button', { name: 'Empty trash' } ).click();
+		const emptyConfirm = page.locator( '#actt-empty-confirm' );
+		await expect( emptyConfirm ).toContainText( 'Delete 1 term for good?' );
+		await expect( emptyConfirm ).toContainText( 'cannot be undone' );
+		await emptyConfirm.getByRole( 'button', { name: 'Delete everything for good' } ).click();
 		await expect( page.locator( '.notice-success' ) ).toContainText( '1 term deleted for good.' );
-		expect( confirmed ).toContain( 'cannot be undone' );
 		await expect( page.getByRole( 'button', { name: 'Empty trash' } ) ).toHaveCount( 0 );
 
 		await page.locator( '#actt-retention' ).selectOption( '90' );
@@ -258,7 +280,7 @@ test.describe( 'Axle Category & Tag Trash', () => {
 		const path = ( name ) => `/wp-abilities/v1/abilities/axle-category-tag-trash/${ name }/run`;
 
 		const listed = await rest( 'GET', '/wp-abilities/v1/abilities?category=axle-category-tag-trash' );
-		expect( listed.body.map( ( ability ) => ability.name ).sort() ).toEqual( [ 'axle-category-tag-trash/delete', 'axle-category-tag-trash/list', 'axle-category-tag-trash/restore' ] );
+		expect( listed.body.map( ( ability ) => ability.name ).sort() ).toEqual( [ 'axle-category-tag-trash/delete', 'axle-category-tag-trash/list', 'axle-category-tag-trash/merge', 'axle-category-tag-trash/preview-merge', 'axle-category-tag-trash/restore' ] );
 		// MCP clients only list abilities marked public.
 		expect( JSON.parse( wpEval( `echo wp_json_encode( array_values( array_filter( array_map( function ( $ability ) { $meta = $ability->get_meta(); return ( ! empty( $meta['public'] ) && ! empty( $meta['mcp']['public'] ) ) ? '' : $ability->get_name(); }, wp_get_abilities() ), function ( $name ) { return 0 === strpos( $name, 'axle-category-tag-trash/' ); } ) ) );` ) ) ).toEqual( [] );
 

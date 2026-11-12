@@ -27,6 +27,10 @@ Axle Category & Tag Trash keeps every deleted term for 30 days (or 7, 90 or 365,
 
 Keeping the same ID matters: navigation blocks, widgets and shortcodes that point to the term by ID work again without editing them.
 
+**Merge** terms when you have the same thing twice: "WordPress", "wordpress" and "Word Press" as three tags. Choose "Merge into..." on a term, or in the bulk actions, pick the term to keep and read the preview. Every post of the old term moves to the one you kept, and the old term goes to the trash. If it was the wrong call, "Undo merge" brings the old term back on all its posts and takes the other term off only the posts that got it through the merge. Posts that already had both keep both. Big merges run in the background with a progress bar.
+
+Who can do what follows the taxonomy's own capabilities. A user who manages tags but not a custom taxonomy never sees, restores, deletes or merges that taxonomy's terms, on the screen or through the Abilities API.
+
 Works with categories, tags, WooCommerce product categories and attributes, and any custom taxonomy that has an admin screen.
 
 Free and open source under the GPL. No pro version, no upsells, no ads in wp-admin, no tracking. And it stays that way.
@@ -34,11 +38,13 @@ Free and open source under the GPL. No pro version, no upsells, no ads in wp-adm
 = Where to find it =
 
 * **Tools > Axle Category & Tag Trash** lists deleted terms with what they were attached to, who deleted them and when. Filter by taxonomy, search, restore or delete in bulk, see exactly which posts, child terms and menus a restore brings back, and empty the trash.
-* Every category and tag screen has a link to it under the list.
+* Every category and tag screen has a link to it under the list, and "Merge into..." in each row and in the bulk actions.
+* The Plugins screen has an "Open the trash" link in this plugin's row.
 
 = WP-CLI =
 
 * `wp axle-category-tag-trash list`
+* `wp axle-category-tag-trash merge <source> <target> --taxonomy=post_tag` (add `--dry-run` to preview)
 * `wp axle-category-tag-trash restore <id>...`
 * `wp axle-category-tag-trash delete <id>...` or `wp axle-category-tag-trash delete --all`
 
@@ -47,6 +53,14 @@ Free and open source under the GPL. No pro version, no upsells, no ads in wp-adm
 Part of [Axle](https://axlewp.com/) by AryanX, a family of free plugins for running WordPress sites safely.
 
 == Frequently Asked Questions ==
+
+= What does a merge change? =
+
+Posts, pages and other items of the old term get the term you kept. The name, slug, description and meta of the term you kept do not change. Menu links to the old term point at the term you kept. Child terms move under the term you kept, or up one level, see the `axle_category_tag_trash_merge_children` filter.
+
+= Can I undo a merge? =
+
+Yes, for as long as the old term is in the trash. Choose "Undo merge" on it. The default term (Uncategorized) cannot be merged away, and a taxonomy you left out of the trash cannot be merged, because it could not be undone.
 
 = What happens if a new term uses the old slug? =
 
