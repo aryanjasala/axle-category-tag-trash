@@ -36,6 +36,13 @@ final class Snapshotter implements Service {
 	private Trash $trash;
 
 	/**
+	 * Whether the Undo notice after a bulk delete is held back, for deletes that are part of a merge.
+	 *
+	 * @var bool
+	 */
+	private static bool $quiet = false;
+
+	/**
 	 * Snapshots of terms being deleted in this request, keyed by term ID.
 	 *
 	 * @var array<int, Snapshot>
@@ -57,6 +64,15 @@ final class Snapshotter implements Service {
 	public function register(): void {
 		add_action( 'pre_delete_term', array( $this, 'capture' ), 10, 2 );
 		add_action( 'delete_term', array( $this, 'commit' ), 10, 3 );
+	}
+
+	/**
+	 * Holds back the Undo notice for deletes that a merge does, which have their own Undo.
+	 *
+	 * @param bool $quiet Whether to hold it back.
+	 */
+	public static function quiet( bool $quiet ): void {
+		self::$quiet = $quiet;
 	}
 
 	/**
@@ -133,7 +149,7 @@ final class Snapshotter implements Service {
 			do_action( 'axle_category_tag_trash_trashed', $item_id, $snapshot );
 		}
 
-		if ( $item_id && $user_id && is_admin() && ! wp_doing_ajax() ) {
+		if ( $item_id && $user_id && is_admin() && ! wp_doing_ajax() && ! self::$quiet ) {
 			$undo   = (array) get_transient( self::undo_key( $user_id ) );
 			$undo[] = $item_id;
 			/**

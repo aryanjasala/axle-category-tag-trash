@@ -1,6 +1,8 @@
 {
   "$comment": "Screens tests/e2e/a11y.spec.js checks with axe-core. This file belongs to the plugin: apply-template.py only writes it when it is missing. The fields are described in docs/DEVELOPMENT.md.",
-  "include": ["#wpbody-content"],
+  "include": [
+    "#wpbody-content"
+  ],
   "exclude": [],
   "screens": [
     {
@@ -10,31 +12,486 @@
     {
       "name": "Tools > Axle Category & Tag Trash with trashed terms and one restore preview open",
       "setup": [
-        { "wp": ["term", "create", "category", "Recipes", "--description=Everything we cook", "--porcelain"], "save": "recipes" },
-        ["post", "create", "--post_title=Sourdough basics", "--post_status=publish", "--post_category={recipes}"],
-        { "wp": ["term", "create", "post_tag", "summer", "--porcelain"], "save": "summer" },
-        ["term", "delete", "category", "{recipes}"],
-        ["term", "delete", "post_tag", "{summer}"]
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "Recipes",
+            "--description=Everything we cook",
+            "--porcelain"
+          ],
+          "save": "recipes"
+        },
+        [
+          "post",
+          "create",
+          "--post_title=Sourdough basics",
+          "--post_status=publish",
+          "--post_category={recipes}"
+        ],
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "summer",
+            "--porcelain"
+          ],
+          "save": "summer"
+        },
+        [
+          "term",
+          "delete",
+          "category",
+          "{recipes}"
+        ],
+        [
+          "term",
+          "delete",
+          "post_tag",
+          "{summer}"
+        ]
       ],
       "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
-      "steps": [{ "click": ".actt-details summary" }],
+      "steps": [
+        {
+          "click": ".actt-details summary"
+        }
+      ],
       "cleanup": [
-        ["axle-category-tag-trash", "delete", "--all", "--yes"],
-        ["eval", "foreach ( get_posts( array( 'title' => 'Sourdough basics', 'post_status' => 'any', 'numberposts' => -1, 'fields' => 'ids' ) ) as $id ) { wp_delete_post( $id, true ); }"]
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ],
+        [
+          "eval",
+          "foreach ( get_posts( array( 'title' => 'Sourdough basics', 'post_status' => 'any', 'numberposts' => -1, 'fields' => 'ids' ) ) as $id ) { wp_delete_post( $id, true ); }"
+        ]
       ]
     },
     {
       "name": "Categories screen with Undo after deleting a category",
-      "setup": [{ "wp": ["term", "create", "category", "Travel", "--porcelain"], "save": "travel" }],
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "Travel",
+            "--porcelain"
+          ],
+          "save": "travel"
+        }
+      ],
       "dialogs": "accept",
       "url": "/wp-admin/edit-tags.php?taxonomy=category",
       "steps": [
-        { "hover": "#tag-{travel}" },
-        { "click": "#tag-{travel} .delete-tag" },
-        { "waitFor": ".axle-category-tag-trash-undo" }
+        {
+          "hover": "#tag-{travel}"
+        },
+        {
+          "click": "#tag-{travel} .delete-tag"
+        },
+        {
+          "waitFor": ".axle-category-tag-trash-undo"
+        }
       ],
-      "include": [".axle-category-tag-trash-undo"],
-      "cleanup": [["axle-category-tag-trash", "delete", "--all", "--yes"]]
+      "include": [
+        ".axle-category-tag-trash-undo"
+      ],
+      "cleanup": [
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash with a delete confirm open in a row",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y row",
+            "--porcelain"
+          ],
+          "save": "t"
+        },
+        [
+          "term",
+          "delete",
+          "post_tag",
+          "{t}"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
+      "steps": [
+        {
+          "hover": "#the-list tr"
+        },
+        {
+          "click": ".actt-delete"
+        },
+        {
+          "waitFor": ".actt-row-confirm"
+        }
+      ],
+      "cleanup": [
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash with the bulk delete confirm open",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y bulk",
+            "--porcelain"
+          ],
+          "save": "t"
+        },
+        [
+          "term",
+          "delete",
+          "post_tag",
+          "{t}"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
+      "steps": [
+        {
+          "click": "#cb-select-all-1"
+        },
+        {
+          "evaluate": "document.querySelector( '#bulk-action-selector-top' ).value = 'delete'"
+        },
+        {
+          "click": "#doaction"
+        },
+        {
+          "waitFor": "#actt-bulk-confirm:not([hidden])"
+        }
+      ],
+      "cleanup": [
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash with the empty trash confirm open",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y empty",
+            "--porcelain"
+          ],
+          "save": "t"
+        },
+        [
+          "term",
+          "delete",
+          "post_tag",
+          "{t}"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
+      "steps": [
+        {
+          "click": ".actt-confirm-open"
+        },
+        {
+          "waitFor": "#actt-empty-confirm:not([hidden])"
+        }
+      ],
+      "cleanup": [
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash with an error notice",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y error",
+            "--porcelain"
+          ],
+          "save": "t"
+        },
+        [
+          "term",
+          "delete",
+          "post_tag",
+          "{t}"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&actt_errors[]=You%20are%20not%20allowed%20to%20restore%20%22Acme%22.",
+      "cleanup": [
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash, merge screen picking the target",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y source",
+            "--porcelain"
+          ],
+          "save": "src"
+        },
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y target",
+            "--porcelain"
+          ],
+          "save": "tgt"
+        }
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&view=merge&taxonomy=post_tag&terms={src}",
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "post_tag",
+          "{src}",
+          "{tgt}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash, merge screen with the preview and confirm step",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y source",
+            "--porcelain"
+          ],
+          "save": "src"
+        },
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y target",
+            "--porcelain"
+          ],
+          "save": "tgt"
+        }
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&view=merge&taxonomy=post_tag&terms={src}&target={tgt}",
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "post_tag",
+          "{src}",
+          "{tgt}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash, merge screen with nothing to merge",
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&view=merge&taxonomy=post_tag&terms=999999"
+    },
+    {
+      "name": "Tools > Category & Tag Trash after a merge, with Undo and the merged term in the list",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y source",
+            "--porcelain"
+          ],
+          "save": "src"
+        },
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y target",
+            "--porcelain"
+          ],
+          "save": "tgt"
+        },
+        [
+          "axle-category-tag-trash",
+          "merge",
+          "{src}",
+          "{tgt}",
+          "--taxonomy=post_tag"
+        ],
+        {
+          "wp": [
+            "axle-category-tag-trash",
+            "list",
+            "--taxonomy=post_tag",
+            "--format=ids"
+          ],
+          "save": "item"
+        }
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&actt_merged={item}",
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "post_tag",
+          "{tgt}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash with a merge running in the background",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y source",
+            "--porcelain"
+          ],
+          "save": "src"
+        },
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y target",
+            "--porcelain"
+          ],
+          "save": "tgt"
+        },
+        [
+          "eval",
+          "$job = wp_insert_post( array( 'post_type' => 'axle_ctt_item', 'post_status' => 'draft', 'post_title' => 'A11y running source' ) ); update_post_meta( $job, '_axle_category_tag_trash_merge_job', array( 'source_id' => (int) '{src}', 'source_tt_id' => 0, 'source_name' => 'A11y running source', 'target_id' => (int) '{tgt}', 'target_tt_id' => 0, 'target_name' => 'A11y running target', 'taxonomy' => 'post_tag', 'children' => 'target', 'total' => 500, 'moved' => 200 ) );"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
+      "cleanup": [
+        [
+          "eval",
+          "foreach ( get_posts( array( 'post_type' => 'axle_ctt_item', 'post_status' => 'draft', 'numberposts' => -1, 'fields' => 'ids' ) ) as $id ) { wp_delete_post( $id, true ); }"
+        ],
+        [
+          "term",
+          "delete",
+          "post_tag",
+          "{src}",
+          "{tgt}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
+    },
+    {
+      "name": "Tags screen with Merge into on the row actions",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "post_tag",
+            "A11y row merge",
+            "--porcelain"
+          ],
+          "save": "t"
+        }
+      ],
+      "url": "/wp-admin/edit-tags.php?taxonomy=post_tag",
+      "steps": [
+        {
+          "hover": "#tag-{t}"
+        }
+      ],
+      "include": [
+        "#tag-{t} .row-actions .axle_merge"
+      ],
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "post_tag",
+          "{t}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
     }
   ],
   "skip": {}

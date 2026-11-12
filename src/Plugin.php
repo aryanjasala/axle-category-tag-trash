@@ -10,6 +10,7 @@ namespace AryanX\Axle\CategoryTagTrash;
 use AryanX\Axle\CategoryTagTrash\Admin\TermScreen;
 use AryanX\Axle\CategoryTagTrash\Admin\TrashPage;
 use AryanX\Axle\CategoryTagTrash\Cli\Command;
+use AryanX\Axle\CategoryTagTrash\Health\SiteHealth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -47,6 +48,13 @@ final class Plugin {
 	private Purger $purger;
 
 	/**
+	 * Merging terms.
+	 *
+	 * @var Merger
+	 */
+	private Merger $merger;
+
+	/**
 	 * Starts the plugin. Runs on `plugins_loaded`.
 	 */
 	public static function boot(): void {
@@ -72,6 +80,7 @@ final class Plugin {
 		$this->trash    = new Trash( new Settings() );
 		$this->restorer = new Restorer( $this->trash );
 		$this->purger   = new Purger( $this->trash );
+		$this->merger   = new Merger( $this->trash );
 	}
 
 	/**
@@ -93,6 +102,15 @@ final class Plugin {
 	}
 
 	/**
+	 * Merging logic, for other plugins.
+	 *
+	 * @return Merger
+	 */
+	public function merger(): Merger {
+		return $this->merger;
+	}
+
+	/**
 	 * Registers the services.
 	 */
 	private function register(): void {
@@ -101,9 +119,11 @@ final class Plugin {
 			$this->restorer,
 			new Snapshotter( $this->trash ),
 			$this->purger,
-			new TrashPage( $this->trash, $this->restorer, $this->purger ),
+			$this->merger,
+			new TrashPage( $this->trash, $this->restorer, $this->purger, $this->merger ),
 			new TermScreen( $this->trash, $this->restorer ),
-			new Abilities( $this->trash, $this->restorer ),
+			new Abilities( $this->trash, $this->restorer, $this->merger ),
+			new SiteHealth( $this->trash, $this->merger ),
 		);
 
 		foreach ( $services as $service ) {
@@ -111,7 +131,7 @@ final class Plugin {
 		}
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			\WP_CLI::add_command( 'axle-category-tag-trash', new Command( $this->trash, $this->restorer, $this->purger ) );
+			\WP_CLI::add_command( 'axle-category-tag-trash', new Command( $this->trash, $this->restorer, $this->purger, $this->merger ) );
 		}
 	}
 }

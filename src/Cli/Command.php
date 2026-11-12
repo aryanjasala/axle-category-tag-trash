@@ -7,6 +7,8 @@
 
 namespace AryanX\Axle\CategoryTagTrash\Cli;
 
+use AryanX\Axle\CategoryTagTrash\Access;
+use AryanX\Axle\CategoryTagTrash\Merger;
 use AryanX\Axle\CategoryTagTrash\Purger;
 use AryanX\Axle\CategoryTagTrash\Restorer;
 use AryanX\Axle\CategoryTagTrash\Trash;
@@ -40,16 +42,25 @@ final class Command {
 	private Purger $purger;
 
 	/**
+	 * Merging terms.
+	 *
+	 * @var Merger
+	 */
+	private Merger $merger;
+
+	/**
 	 * Sets up the command.
 	 *
 	 * @param Trash    $trash    Trashed terms.
 	 * @param Restorer $restorer Restore logic.
 	 * @param Purger   $purger   Purging and emptying.
+	 * @param Merger   $merger   Merging terms.
 	 */
-	public function __construct( Trash $trash, Restorer $restorer, Purger $purger ) {
+	public function __construct( Trash $trash, Restorer $restorer, Purger $purger, Merger $merger ) {
 		$this->trash    = $trash;
 		$this->restorer = $restorer;
 		$this->purger   = $purger;
+		$this->merger   = $merger;
 	}
 
 	/**
@@ -77,7 +88,7 @@ final class Command {
 		do {
 			$found   = $this->trash->find(
 				array(
-					'taxonomy' => $assoc_args['taxonomy'] ?? '',
+					'taxonomy' => Access::taxonomy_name( $assoc_args['taxonomy'] ?? '' ),
 					'per_page' => Trash::MAX_PER_PAGE,
 					'page'     => $page++,
 				)
@@ -97,24 +108,120 @@ final class Command {
 			$snapshot = $this->trash->get( $item_id );
 			if ( $snapshot ) {
 				$rows[] = array(
-					'id'       => $item_id,
-					'term_id'  => $snapshot->term_id,
-					'name'     => $snapshot->name,
-					'taxonomy' => $snapshot->taxonomy,
-					'objects'  => $snapshot->total_objects(),
-					'deleted'  => get_post_field( 'post_date_gmt', $item_id ),
+					'id'          => $item_id,
+					'term_id'     => $snapshot->term_id,
+					'name'        => $snapshot->name,
+					'taxonomy'    => $snapshot->taxonomy,
+					'objects'     => $snapshot->total_objects(),
+					'merged_into' => (int) ( $this->trash->merge_info( $item_id )['target_id'] ?? 0 ),
+					'deleted'     => get_post_field( 'post_date_gmt', $item_id ),
 				);
 			}
 		}
 
-		\WP_CLI\Utils\format_items( $format, $rows, array( 'id', 'term_id', 'name', 'taxonomy', 'objects', 'deleted' ) );
+		\WP_CLI\Utils\format_items( $format, $rows, array( 'id', 'term_id', 'name', 'taxonomy', 'objects', 'merged_into', 'deleted' ) );
+	}
+
+	/**
+	 * Merges one term into another, and puts the old term in the trash.
+	 *
+	 * Moves every post of <source> to <target>. Restore the trash item that
+	 * this prints to undo it: the source comes back, and the target comes off
+	 * only the posts that got it through the merge. Run it again for a merge
+	 * that stopped, to finish it.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <source>
+	 * : Term ID or slug to merge away.
+	 *
+	 * <target>
+	 * : Term ID or slug to merge into.
+	 *
+	 * --taxonomy=<taxonomy>
+	 * : Taxonomy of both terms, such as post_tag or category.
+	 *
+	 * [--children=<policy>]
+	 * : What happens to the source's child terms: `target` moves them under the target, `parent` moves them up one level. Default `target`, changed by a filter.
+	 *
+	 * [--dry-run]
+	 * : Show what would happen and change nothing.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp axle-category-tag-trash merge WordPress WordPress --taxonomy=post_tag --dry-run
+	 *     wp axle-category-tag-trash merge 12 7 --taxonomy=category
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Named arguments.
+	 */
+	public function merge( array $args, array $assoc_args ): void {
+		$taxonomy = Access::taxonomy_name( $assoc_args['taxonomy'] ?? '' );
+		$source   = $this->term_id( $args[0], $taxonomy );
+		$target   = $this->term_id( $args[1], $taxonomy );
+		$children = (string) ( $assoc_args['children'] ?? '' );
+
+		if ( ! empty( $assoc_args['dry-run'] ) ) {
+			$preview = $this->merger->preview( $source, $target, $taxonomy, $children );
+			if ( is_wp_error( $preview ) ) {
+				\WP_CLI::error( $preview->get_error_message() );
+			}
+
+			\WP_CLI::line( sprintf( 'Would merge "%s" into "%s".', $preview['source_name'], $preview['target_name'] ) );
+			\WP_CLI::line( sprintf( '  %d items on the source, %d already on the target, %d would move.', $preview['objects'], $preview['already'], $preview['moving'] ) );
+			\WP_CLI::line( sprintf( '  %d child terms (%s), %d menu links.', $preview['children'], $preview['children_policy'], $preview['menu_links'] ) );
+			\WP_CLI::line( '  The source goes to the trash. Restore it to undo the merge.' );
+			return;
+		}
+
+		$result = $this->merger->merge(
+			$source,
+			$target,
+			$taxonomy,
+			array(
+				'children'   => $children,
+				'finish_now' => true,
+			) 
+		);
+		if ( is_wp_error( $result ) ) {
+			\WP_CLI::error( $result->get_error_message() );
+		}
+
+		\WP_CLI::success( sprintf( 'Merged "%s" into "%s". %d items moved.', $result['source_name'], $result['target_name'], $result['moved'] ) );
+		foreach ( $result['notes'] as $note ) {
+			\WP_CLI::line( '  ' . $note );
+		}
+		if ( $result['item_id'] ) {
+			\WP_CLI::line( '  Undo: wp axle-category-tag-trash restore ' . $result['item_id'] );
+		}
+	}
+
+	/**
+	 * Finds a term ID from an ID or a slug.
+	 *
+	 * @param string $value    ID or slug.
+	 * @param string $taxonomy Taxonomy name.
+	 * @return int
+	 */
+	private function term_id( string $value, string $taxonomy ): int {
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			\WP_CLI::error( 'Unknown taxonomy "' . $taxonomy . '". Pass --taxonomy=<taxonomy>.' );
+		}
+
+		$term = ctype_digit( $value ) ? get_term( (int) $value, $taxonomy ) : get_term_by( 'slug', $value, $taxonomy );
+		if ( ! $term instanceof \WP_Term ) {
+			\WP_CLI::error( 'No term "' . $value . '" in ' . $taxonomy . '.' );
+		}
+
+		return (int) $term->term_id;
 	}
 
 	/**
 	 * Restores trashed terms.
 	 *
 	 * Re-attaches every post in this run, even for a term on a million posts, and finishes
-	 * restores that were running in the background.
+	 * restores that were running in the background. A term that was merged away comes back
+	 * as an undo of the merge.
 	 *
 	 * ## OPTIONS
 	 *

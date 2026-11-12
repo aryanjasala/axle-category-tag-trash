@@ -35,6 +35,8 @@
 
 		$button.on( 'click', function () {
 			$button.prop( 'disabled', true ).text( settings.i18n.restoring );
+			$notice.attr( 'aria-busy', 'true' );
+			$button.after( $( '<span class="spinner is-active actt-spinner"></span>' ) );
 
 			$.post( window.ajaxurl, {
 				action: settings.action,
@@ -51,9 +53,10 @@
 				} )
 				.fail( function ( xhr ) {
 					var message = xhr.responseJSON && xhr.responseJSON.data ? xhr.responseJSON.data.message : settings.i18n.failed;
-					$notice.removeClass( 'notice-success' ).addClass( 'notice-error' );
-					$text.text( message );
+					$notice.removeClass( 'notice-success' ).addClass( 'notice-error' ).attr( 'aria-busy', 'false' ).find( '.spinner' ).remove();
+					$text.text( message + ' ' + settings.i18n.retry );
 					$button.remove();
+					wp.a11y.speak( $text.text(), 'assertive' );
 				} );
 		} );
 	}

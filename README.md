@@ -34,11 +34,15 @@ Posts and pages go to the trash when you delete them. Categories and tags don't:
 ## Features
 
 - **Undo** right after a delete, on every term screen, for single and bulk deletes
+- **Merge terms**: "Merge into…" on every term screen, as a row action and a bulk action. Pick the term to keep, check the preview, confirm. The old term goes to the trash
+- **Undo a merge**: the old term comes back on all its posts, and the term you kept comes off only the posts that got it through the merge. Posts that had both keep both
 - **Same ID** on restore, so navigation blocks, widgets and shortcodes that store the ID work again
 - **Everything comes back**: term meta, posts (in the same order), child terms and menu links in their menu position
 - Posts that only got **Uncategorized** because of the delete lose it again
 - **Tools > Axle Category & Tag Trash**: taxonomy tabs, search, bulk restore and delete, Empty trash, and what each restore brings back
 - Kept for **7, 30, 90 or 365 days**, then a daily task deletes them for good
+- Big merges and restores run in batches in the background, with a progress bar
+- Each taxonomy's own capabilities decide who sees, restores, deletes or merges its terms
 - Categories, tags, WooCommerce product categories and attributes, and any custom taxonomy with an admin screen
 
 ## Install
@@ -59,6 +63,7 @@ Needs WordPress 6.6+ and PHP 7.4+. To try it first, [try.axlewp.com/axle-categor
 Everything on the screen is also on WP-CLI:
 
 ```sh
+wp axle-category-tag-trash merge wordpress word-press --taxonomy=post_tag --dry-run
 wp axle-category-tag-trash list --taxonomy=category
 wp axle-category-tag-trash restore 42
 wp axle-category-tag-trash delete --all
@@ -96,9 +101,12 @@ src/
 ├── Snapshot.php         everything about a term at the moment it was deleted
 ├── Snapshotter.php      captures terms on pre_delete_term, saves on delete_term
 ├── Restorer.php         puts a term, its posts, children and menu links back
+├── Merger.php           merges one term into another, in batches
+├── Access.php           per-taxonomy capability checks
 ├── Trash.php            storage (a hidden post type) and queries
 ├── Purger.php           daily cleanup after the retention period
-├── Admin/               trash screen, list table, Undo notices
+├── Health/              Site Health test for stuck background jobs
+├── Admin/               trash screen, merge screen, list table, Undo notices
 └── Cli/Command.php      wp axle-category-tag-trash
 assets/                  term screen script and styles
 tests/
@@ -114,8 +122,8 @@ Small plugins that each fill one gap in WordPress, all free with no pro version.
 
 | | Plugin | What it does |
 | --- | --- | --- |
-| <img src="https://raw.githubusercontent.com/aryanjasala/page-template-usage/main/.wordpress-org/icon-128x128.png" alt="" width="32"> | [Page Template Usage](https://github.com/aryanjasala/page-template-usage) | See which template every page uses, and fix the pages on a missing template |
-| <img src="https://raw.githubusercontent.com/aryanjasala/axle-staging-guard/main/.wordpress-org/icon-128x128.png" alt="" width="32"> | [Axle Staging Guard](https://github.com/aryanjasala/axle-staging-guard) | Stops staging copies from emailing real people or getting indexed |
+| <img src="https://raw.githubusercontent.com/aryanjasala/axle-page-template-usage/main/.wordpress-org/icon-128x128.png" alt="" width="32"> | [Axle Page Template Usage](https://github.com/aryanjasala/axle-page-template-usage) | See which template every page uses, and fix the pages on a missing template |
+| <img src="https://raw.githubusercontent.com/aryanjasala/axle-staging-guard/main/.wordpress-org/icon-128x128.png" alt="" width="32"> | [Axle Staging Guard](https://github.com/aryanjasala/axle-staging-guard) | Stops staging copies from emailing real people, calling live APIs or getting indexed |
 | <img src="https://raw.githubusercontent.com/aryanjasala/axle-read-only-mode/main/.wordpress-org/icon-128x128.png" alt="" width="32"> | [Axle Read-Only Mode](https://github.com/aryanjasala/axle-read-only-mode) | Read-only mode for WordPress during migrations and deploys |
 | <img src="https://raw.githubusercontent.com/aryanjasala/axle-block-restore/main/.wordpress-org/icon-128x128.png" alt="" width="32"> | [Axle Block Restore](https://github.com/aryanjasala/axle-block-restore) | Restore a single block from an old revision, not the whole post |
 | <img src="https://raw.githubusercontent.com/aryanjasala/activity-log-with-undo/main/.wordpress-org/icon-128x128.png" alt="" width="32"> | [Activity Log with Undo](https://github.com/aryanjasala/activity-log-with-undo) | An activity log where every change you can reverse has an Undo button |

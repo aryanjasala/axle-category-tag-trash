@@ -29,6 +29,7 @@ function axle_category_tag_trash_uninstall_site(): void {
 
 		foreach ( $axle_category_tag_trash_items as $axle_category_tag_trash_item ) {
 			wp_clear_scheduled_hook( 'axle_category_tag_trash_restore_batch', array( $axle_category_tag_trash_item ) );
+			wp_clear_scheduled_hook( 'axle_category_tag_trash_merge_batch', array( $axle_category_tag_trash_item ) );
 			wp_delete_post( $axle_category_tag_trash_item, true );
 		}
 	} while ( $axle_category_tag_trash_items );

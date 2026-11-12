@@ -7,6 +7,7 @@
 
 namespace AryanX\Axle\CategoryTagTrash\Admin;
 
+use AryanX\Axle\CategoryTagTrash\Access;
 use AryanX\Axle\CategoryTagTrash\Snapshot;
 use AryanX\Axle\CategoryTagTrash\Trash;
 
@@ -68,12 +69,14 @@ final class TrashListTable extends \WP_List_Table {
 	public function prepare_items(): void {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only search.
 		$search = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['s'] ) ) : '';
-		$found  = $this->trash->find(
+		// Only taxonomies this user may manage, so the list, its counts and its pages never include the rest.
+		$found = $this->trash->find(
 			array(
-				'taxonomy' => $this->current_taxonomy(),
-				'search'   => $search,
-				'per_page' => self::PER_PAGE,
-				'page'     => $this->get_pagenum(),
+				'taxonomy'   => $this->current_taxonomy(),
+				'taxonomies' => $this->trash->accessible_taxonomies( Access::LIST ),
+				'search'     => $search,
+				'per_page'   => self::PER_PAGE,
+				'page'       => $this->get_pagenum(),
 			)
 		);
 
@@ -121,7 +124,7 @@ final class TrashListTable extends \WP_List_Table {
 	 * @return array<string, string>
 	 */
 	protected function get_views(): array {
-		$counts  = $this->trash->count_by_taxonomy();
+		$counts  = $this->trash->count_by_taxonomy( Access::LIST );
 		$current = $this->current_taxonomy();
 		$base    = admin_url( 'tools.php?page=' . TrashPage::SLUG );
 		$views   = array(
@@ -164,7 +167,7 @@ final class TrashListTable extends \WP_List_Table {
 	 * Message when the trash is empty.
 	 */
 	public function no_items(): void {
-		esc_html_e( 'Axle Category & Tag Trash is empty.', 'axle-category-tag-trash' );
+		esc_html_e( 'Nothing in the trash matches. Clear the search or pick All.', 'axle-category-tag-trash' );
 	}
 
 	/**
@@ -194,24 +197,43 @@ final class TrashListTable extends \WP_List_Table {
 		$snapshot = $this->snapshots[ $item_id ];
 		$actions  = array();
 
-		if ( taxonomy_exists( $snapshot->taxonomy ) ) {
-			$actions['restore'] = sprintf( '<a href="%s" class="actt-restore">%s</a>', esc_url( TrashPage::action_url( 'restore', array( $item_id ) ) ), esc_html__( 'Restore', 'axle-category-tag-trash' ) );
+		$merge = $this->trash->merge_info( $item_id );
+
+		if ( taxonomy_exists( $snapshot->taxonomy ) && $this->trash->user_can_manage( $snapshot, Access::RESTORE ) ) {
+			$actions['restore'] = sprintf(
+				'<a href="%s" class="actt-restore">%s</a>',
+				esc_url( TrashPage::action_url( 'restore', array( $item_id ) ) ),
+				$merge ? esc_html__( 'Undo merge', 'axle-category-tag-trash' ) : esc_html__( 'Restore', 'axle-category-tag-trash' )
+			);
 		}
-		/* translators: %s: term name. */
-		$confirm           = sprintf( __( 'Delete "%s" for good? It leaves the trash and cannot be restored. This cannot be undone.', 'axle-category-tag-trash' ), $snapshot->name );
-		$actions['delete'] = sprintf(
-			'<a href="%s" class="submitdelete" onclick="return window.confirm( \'%s\' );">%s</a>',
-			esc_url( TrashPage::action_url( 'delete', array( $item_id ) ) ),
-			esc_attr( esc_js( $confirm ) ),
-			esc_html__( 'Delete permanently', 'axle-category-tag-trash' )
-		);
+		if ( $this->trash->user_can_manage( $snapshot, Access::DELETE ) ) {
+			$actions['delete'] = sprintf(
+				'<a href="%1$s" class="submitdelete actt-delete" data-title="%2$s" data-body="%3$s" data-yes="%4$s">%5$s</a>',
+				esc_url( TrashPage::action_url( 'delete', array( $item_id ) ) ),
+				/* translators: %s: term name. */
+				esc_attr( sprintf( __( 'Delete "%s" for good?', 'axle-category-tag-trash' ), $snapshot->name ) ),
+				esc_attr( __( 'It leaves the trash and cannot be restored. This cannot be undone.', 'axle-category-tag-trash' ) ),
+				esc_attr__( 'Delete permanently', 'axle-category-tag-trash' ),
+				esc_html__( 'Delete permanently', 'axle-category-tag-trash' )
+			);
+		}
+
+		$note = '';
+		if ( $merge ) {
+			$note = sprintf(
+				'<br><span class="axle-badge axle-badge--info">%s</span>',
+				/* translators: %s: name of the term this one was merged into. */
+				esc_html( sprintf( __( 'Merged into %s', 'axle-category-tag-trash' ), $merge['target_name'] ) )
+			);
+		}
 
 		return sprintf(
-			'<strong class="actt-name">%s</strong> <code class="actt-slug">%s</code>%s%s',
+			'<strong class="actt-name">%s</strong> <code class="actt-slug">%s</code>%s%s%s',
 			esc_html( $snapshot->name ),
 			esc_html( $snapshot->slug ),
+			$note,
 			$this->row_actions( $actions ),
-			$this->details( $snapshot )
+			$this->details( $snapshot, $merge )
 		);
 	}
 
@@ -257,10 +279,8 @@ final class TrashListTable extends \WP_List_Table {
 		$time    = (int) get_post_time( 'U', true, $post );
 
 		return sprintf(
-			'<span title="%s">%s</span><br><span class="axle-muted">%s</span>',
-			esc_attr( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $time ) ),
-			/* translators: %s: time ago, e.g. "5 mins". */
-			esc_html( sprintf( __( '%s ago', 'axle-category-tag-trash' ), human_time_diff( $time ) ) ),
+			'%s<br><span class="axle-muted">%s</span>',
+			AxleUi::relative_time( $time ),
 			/* translators: %s: user name. */
 			esc_html( sprintf( __( 'by %s', 'axle-category-tag-trash' ), $deleter ? $deleter->display_name : __( 'WP-CLI or a script', 'axle-category-tag-trash' ) ) )
 		);
@@ -291,11 +311,24 @@ final class TrashListTable extends \WP_List_Table {
 	/**
 	 * Expandable list of the posts, child terms and menus restore will bring back.
 	 *
-	 * @param Snapshot $snapshot Trashed term.
+	 * @param Snapshot   $snapshot Trashed term.
+	 * @param array|null $merge    The merge saved with the item, when it was merged away.
 	 * @return string
 	 */
-	private function details( Snapshot $snapshot ): string {
+	private function details( Snapshot $snapshot, ?array $merge = null ): string {
 		$lines = array();
+
+		if ( $merge ) {
+			$lines[] = '<strong>' . esc_html__( 'Merge:', 'axle-category-tag-trash' ) . '</strong> '
+				. esc_html(
+					sprintf(
+						/* translators: 1: name of the term it was merged into, 2: number of posts that got that term through the merge. */
+						_n( 'Merged into "%1$s", which %2$s post got through the merge. Undo takes "%1$s" off just that post.', 'Merged into "%1$s", which %2$s posts got through the merge. Undo takes "%1$s" off just those posts.', (int) $merge['moved'], 'axle-category-tag-trash' ),
+						$merge['target_name'],
+						number_format_i18n( (int) $merge['moved'] )
+					)
+				);
+		}
 
 		$posts  = array();
 		$sample = $snapshot->sample();

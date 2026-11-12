@@ -17,6 +17,16 @@
 | `axle_category_tag_trash_restore_complete` | action | `( int $term_id, string $taxonomy, Snapshot $snapshot )`. Fires once every object is back |
 | `axle_category_tag_trash_restore_batch_size` | filter | `( int $size )`. Objects re-attached per request or cron run. Default 5000 |
 | `axle_category_tag_trash_capability` | filter | `( string $capability )`. Capability for Tools > Axle Category & Tag Trash. Default `manage_categories`. Each restore and delete still checks the term's own taxonomy |
+| `axle_category_tag_trash_can_access_taxonomy` | filter | `( bool $allowed, string $taxonomy, string $context, int $user_id )`. Whether the user may use the trash for a taxonomy. `$context` is `list`, `restore`, `delete` or `merge`. The default follows the taxonomy's own `manage_terms`, `edit_terms` and `delete_terms` capabilities. Runs on the trash screen, row and bulk actions, the term screens and abilities. WP-CLI has no user, so it is not checked |
+| `axle_category_tag_trash_can_merge` | filter | `( bool $allowed, WP_Term $source, WP_Term $target )`. Whether the user may merge this pair, after the taxonomy and per-term capability checks |
+| `axle_category_tag_trash_merge_children` | filter | `( string $policy, WP_Term $source, WP_Term $target )`. What happens to the source's child terms: `target` (default) moves them under the target, `parent` moves them up one level like a normal delete |
+| `axle_category_tag_trash_merge_batch_size` | filter | `( int $size )`. Posts a merge moves per request or cron run. Default 5000, at least 100 |
+| `axle_category_tag_trash_merge_search_limit` | filter | `( int $limit, string $taxonomy )`. Terms listed as possible targets on the merge screen. Default 20, at most 100 |
+| `axle_category_tag_trash_merged_notice` | filter | `( string $message, int[] $item_ids, int $moved )`. Text of the notice after a merge |
+| `axle_category_tag_trash_before_merge` | action | `( WP_Term $source, WP_Term $target, string $children )`. A merge is about to start |
+| `axle_category_tag_trash_merge_batch_moved` | action | `( int $target_id, int $source_id, int[] $object_ids )`. A batch of posts now has the target term |
+| `axle_category_tag_trash_merged` | action | `( int $item_id, WP_Term $source, WP_Term $target, int $moved )`. A merge finished and the old term is in the trash. `$item_id` is 0 when a filter kept it out of the trash |
+| `axle_category_tag_trash_merge_undone` | action | `( int $term_id, int $target_id, string $taxonomy, Snapshot $snapshot )`. A merge was undone: the old term is back on all its posts |
 
 ```php
 // Never keep deleted tags.
@@ -37,20 +47,25 @@ On WordPress 6.9 and later, Axle Category & Tag Trash registers [abilities](http
 
 | Ability | Does | Needs |
 | --- | --- | --- |
-| `axle-category-tag-trash/list` | Read-only. Trashed terms, newest first, with what a restore brings back. Input: `taxonomy`, `search`, `limit`, `page` | the Axle Category & Tag Trash capability. Terms of taxonomies you cannot manage are left out |
-| `axle-category-tag-trash/restore` | Restores trash item `id` with its posts, child terms and menu links | the Axle Category & Tag Trash capability and the term's own taxonomy |
-| `axle-category-tag-trash/delete` | Deletes trash item `id` for good. Destructive, so the REST API runs it with `DELETE` | the Axle Category & Tag Trash capability and the term's own taxonomy |
+| `axle-category-tag-trash/list` | Read-only. Trashed terms, newest first, with what a restore brings back and `merged_into` for merged terms. Input: `taxonomy`, `search`, `limit`, `page` | the Axle Category & Tag Trash capability, and `manage_terms` of the taxonomy. Taxonomies you cannot manage are left out of the items and the total, and asking for one is a 403 |
+| `axle-category-tag-trash/restore` | Restores trash item `id` with its posts, child terms and menu links. For a merged-away term it undoes the merge | the Axle Category & Tag Trash capability, and `manage_terms` and `edit_terms` of the term's taxonomy |
+| `axle-category-tag-trash/delete` | Deletes trash item `id` for good. Destructive, so the REST API runs it with `DELETE` | the Axle Category & Tag Trash capability, and `manage_terms` and `delete_terms` of the term's taxonomy |
+| `axle-category-tag-trash/preview-merge` | Read-only. What merging `source` into `target` would do: posts that move, posts that already have the target, child terms, menu links. Input: `taxonomy`, `source`, `target`, `children` | as `merge` |
+| `axle-category-tag-trash/merge` | Moves every post of `source` to `target` and trashes `source`. Destructive, but restoring the trash item undoes it. Returns `item_id` once done, or `done: false` while the rest runs in the background | the Axle Category & Tag Trash capability, `manage_terms`, `edit_terms` and `delete_terms` of the taxonomy, `delete_term` on the source and `edit_term` on the target |
 
 ## WP-CLI
 
 ```sh
 wp axle-category-tag-trash list [--taxonomy=<taxonomy>] [--format=table|csv|json|count|ids]
+wp axle-category-tag-trash merge <source> <target> --taxonomy=<taxonomy> [--children=target|parent] [--dry-run]
 wp axle-category-tag-trash restore <id>...
 wp axle-category-tag-trash delete <id>...
 wp axle-category-tag-trash delete --all [--yes]
 ```
 
 `<id>` is the trash item ID from `wp axle-category-tag-trash list`, not the term ID. `restore` re-attaches every object in the same run, even for a term on a million posts, and also finishes a restore that is running in the background.
+
+`merge` takes term IDs or slugs, moves every post in the same run and prints the trash item to restore for an undo. `--dry-run` shows what would happen and changes nothing. Run it again for a merge that stopped, and it carries on where it was.
 
 ## PHP API
 
@@ -61,6 +76,17 @@ $plugin->trash()->find( array( 'taxonomy' => 'category', 'per_page' => 100 ) ); 
 $plugin->restorer()->restore( $item_id );        // [ 'term_id' => n, 'notes' => [...], 'background' => bool ] or WP_Error
 $plugin->restorer()->restore( $item_id, true );  // the same, with every object re-attached before it returns
 ```
+
+## How a merge works
+
+Merging `source` into `target`:
+
+1. Checks the taxonomy's capabilities, `delete_term` on the source and `edit_term` on the target. The default term cannot be merged away, and the taxonomy must be one that is kept in the trash, so the merge can be undone.
+2. Moves the posts in batches of up to 5,000 per request or cron run. A batch finds posts that have the source but not the target, saves their IDs as the posts that gained the target, then adds the target. Posts that already had both are not touched.
+3. When none are left, points menu links at the target and moves child terms under the target (or leaves them to WordPress, see the `axle_category_tag_trash_merge_children` filter).
+4. Deletes the source through the normal delete, so it lands in the trash with a snapshot of exactly which posts it was on.
+
+Undo restores the source on all its posts, then takes the target off the posts that gained it through the merge, moves child terms and menu links back, and recounts both terms. A big undo runs in the background like any big restore.
 
 ## How a restore works
 
@@ -91,7 +117,10 @@ Each trashed term is an `axle_ctt_item` post (hidden, not exported, kept when it
 | `_axle_category_tag_trash_objects` | one row per 1,000 objects, packed as `id:order,id:order` |
 | `_axle_category_tag_trash_fallback` | one row per 1,000 objects that only had this term, packed as `id,id` |
 | `_axle_category_tag_trash_restore_state` | where a background restore is up to |
+| `_axle_category_tag_trash_merge` | on an item that was merged away: the target, how many posts gained it, child terms and menu links that moved |
+| `_axle_category_tag_trash_merge_gained` | one row per 1,000 posts that got the target term through the merge, packed as `id,id` |
+| `_axle_category_tag_trash_merge_job` | on a running merge: source, target, how far it got |
 
-Items in the trash have the status `publish`, items being restored in the background `pending`. The setting is the `axle_category_tag_trash_settings` option. The cron events are `axle_category_tag_trash_purge` (daily), `axle_category_tag_trash_empty` and `axle_category_tag_trash_restore_batch`.
+Items in the trash have the status `publish`, items being restored in the background `pending`, and merges that are still moving posts `draft`. The setting is the `axle_category_tag_trash_settings` option. The cron events are `axle_category_tag_trash_purge` (daily), `axle_category_tag_trash_empty`, `axle_category_tag_trash_restore_batch` and `axle_category_tag_trash_merge_batch`.
 
 Uninstalling removes all of it on every site of a multisite network, 100 sites at a time.

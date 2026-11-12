@@ -126,25 +126,22 @@ final class Purger implements Service {
 	 * Deletes up to $limit items now. If more are left, the rest are deleted
 	 * through WP-Cron, so emptying a big trash never times out a request.
 	 *
-	 * @param int           $limit    Items to delete in this request.
-	 * @param callable|null $can_user Optional check run on each snapshot before it is deleted.
+	 * @param int           $limit      Items to delete in this request.
+	 * @param string[]|null $taxonomies Only empty these taxonomies, and leave the rest to the people who may manage them. Null empties everything, in the background too.
 	 * @return array{deleted: int, remaining: int}
 	 */
-	public function empty_trash( int $limit = 200, ?callable $can_user = null ): array {
+	public function empty_trash( int $limit = 200, ?array $taxonomies = null ): array {
 		$deleted = 0;
+		$scope   = null === $taxonomies ? array() : array( 'taxonomies' => $taxonomies );
 
 		while ( $deleted < $limit ) {
-			$ids = $this->trash->find( array( 'per_page' => min( self::BATCH, $limit - $deleted ) ) )['ids'];
+			$ids = $this->trash->find( $scope + array( 'per_page' => min( self::BATCH, $limit - $deleted ) ) )['ids'];
 			if ( ! $ids ) {
 				break;
 			}
 
 			$progress = 0;
 			foreach ( $ids as $item_id ) {
-				$snapshot = $this->trash->get( $item_id );
-				if ( $can_user && ( ! $snapshot || ! $can_user( $snapshot ) ) ) {
-					continue;
-				}
 				$progress += (int) $this->trash->delete( $item_id );
 			}
 
@@ -154,8 +151,8 @@ final class Purger implements Service {
 			}
 		}
 
-		$remaining = $this->trash->find( array( 'per_page' => 1 ) )['total'];
-		if ( $remaining && ! $can_user && ! wp_next_scheduled( self::EMPTY_HOOK ) ) {
+		$remaining = $this->trash->find( $scope + array( 'per_page' => 1 ) )['total'];
+		if ( $remaining && null === $taxonomies && ! wp_next_scheduled( self::EMPTY_HOOK ) ) {
 			wp_schedule_single_event( time(), self::EMPTY_HOOK );
 		}
 

@@ -75,7 +75,7 @@ final class Restorer implements Service {
 
 		foreach ( $item_ids as $item_id ) {
 			$snapshot = $this->trash->get( (int) $item_id );
-			if ( $snapshot && ! $this->trash->user_can_manage( $snapshot ) ) {
+			if ( $snapshot && ! $this->trash->user_can_manage( $snapshot, Access::RESTORE ) ) {
 				$result['errors'][] = sprintf(
 					/* translators: %s: term name. */
 					__( 'You are not allowed to restore "%s".', 'axle-category-tag-trash' ),
@@ -207,12 +207,23 @@ final class Restorer implements Service {
 			$notes[] = sprintf( __( 'Some menu links to "%s" were not restored because their menu no longer exists.', 'axle-category-tag-trash' ), $snapshot->name );
 		}
 
+		$merge = $this->trash->merge_info( $item_id );
+		if ( $merge ) {
+			$this->undo_merge_links( $merge, $snapshot, $term_id );
+			/* translators: 1: restored term name, 2: name of the term it was merged into. */
+			$notes[] = sprintf( __( 'Merge undone. "%2$s" is taken off the items that only got it through the merge, and "%1$s" is back on all its items.', 'axle-category-tag-trash' ), $snapshot->name, $merge['target_name'] );
+		}
+
 		$state = array(
 			'term_id' => $term_id,
 			'tt_id'   => $tt_id,
 			'phase'   => 'objects',
 			'offset'  => 0,
 		);
+		if ( $merge ) {
+			$state['target_tt_id'] = (int) $merge['target_tt_id'];
+			$state['target_id']    = (int) $merge['target_id'];
+		}
 
 		$object_ids = array();
 		$done       = $this->run_batches( $item_id, $snapshot, $state, $finish_now ? PHP_INT_MAX : $this->batch_size(), $object_ids );
@@ -345,12 +356,22 @@ final class Restorer implements Service {
 
 		wp_defer_term_counting( true );
 		while ( $spent < $budget ) {
-			$key   = 'objects' === $state['phase'] ? Trash::OBJECTS_KEY : Trash::FALLBACK_KEY;
-			$chunk = $this->trash->chunks( $item_id, $snapshot, $key, (int) $state['offset'], 1 );
+			$keys  = array(
+				'objects'  => Trash::OBJECTS_KEY,
+				'fallback' => Trash::FALLBACK_KEY,
+				'gained'   => Trash::GAINED_KEY,
+			);
+			$chunk = $this->trash->chunks( $item_id, $snapshot, $keys[ $state['phase'] ] ?? Trash::GAINED_KEY, (int) $state['offset'], 1 );
 
 			if ( ! $chunk ) {
 				if ( 'objects' === $state['phase'] ) {
 					$state['phase']  = 'fallback';
+					$state['offset'] = 0;
+					continue;
+				}
+				if ( 'fallback' === $state['phase'] && ! empty( $state['target_tt_id'] ) ) {
+					// Undoing a merge: the target term comes off what only got it through the merge.
+					$state['phase']  = 'gained';
 					$state['offset'] = 0;
 					continue;
 				}
@@ -365,9 +386,13 @@ final class Restorer implements Service {
 					$object_ids = array_merge( $object_ids, array_slice( $ids, 0, self::REPORTED_IDS - count( $object_ids ) ) );
 				}
 				$spent += count( $pairs );
-			} else {
+			} elseif ( 'fallback' === $state['phase'] ) {
 				$ids = Snapshot::unpack_ids( $chunk[0] );
 				$this->drop_fallback( $snapshot, (int) $state['term_id'], (int) $state['tt_id'], $ids );
+				$spent += count( $ids );
+			} else {
+				$ids = Snapshot::unpack_ids( $chunk[0] );
+				$this->release_target( $snapshot->taxonomy, (int) $state['target_tt_id'], $ids );
 				$spent += count( $ids );
 			}
 
@@ -527,6 +552,58 @@ final class Restorer implements Service {
 	}
 
 	/**
+	 * Takes the target term of a merge off objects that only got it through the merge.
+	 *
+	 * @param string $taxonomy Taxonomy name.
+	 * @param int    $tt_id    Term taxonomy ID of the merge target.
+	 * @param int[]  $ids      Objects that got the target through the merge.
+	 */
+	private function release_target( string $taxonomy, int $tt_id, array $ids ): void {
+		global $wpdb;
+
+		if ( ! $ids || ! get_term_by( 'term_taxonomy_id', $tt_id, $taxonomy ) ) {
+			// The target was deleted since the merge: nothing to take it off.
+			return;
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholders are built from the chunk size.
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->term_relationships} WHERE term_taxonomy_id = %d AND object_id IN ( {$placeholders} )", array_merge( array( $tt_id ), $ids ) ) );
+
+		foreach ( (array) get_taxonomy( $taxonomy )->object_type as $object_type ) {
+			clean_object_term_cache( $ids, $object_type );
+		}
+
+		foreach ( $ids as $object_id ) {
+			/** This action is documented in wp-includes/taxonomy.php */
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core hook.
+			do_action( 'deleted_term_relationships', $object_id, array( $tt_id ), $taxonomy );
+		}
+	}
+
+	/**
+	 * Puts back what a merge changed besides the objects: child terms and menu links.
+	 *
+	 * @param array    $merge    The merge saved with the trash item.
+	 * @param Snapshot $snapshot Trashed term.
+	 * @param int      $term_id  Restored term ID.
+	 */
+	private function undo_merge_links( array $merge, Snapshot $snapshot, int $term_id ): void {
+		foreach ( (array) ( $merge['reparented'] ?? array() ) as $move ) {
+			$child = get_term( (int) $move['id'], $snapshot->taxonomy );
+			if ( $child instanceof \WP_Term && (int) $child->parent === (int) $move['to'] ) {
+				wp_update_term( (int) $move['id'], $snapshot->taxonomy, array( 'parent' => $term_id ) );
+			}
+		}
+
+		foreach ( array_map( 'intval', (array) ( $merge['menu_items'] ?? array() ) ) as $menu_item_id ) {
+			if ( (int) get_post_meta( $menu_item_id, '_menu_item_object_id', true ) === (int) $merge['target_id'] ) {
+				update_post_meta( $menu_item_id, '_menu_item_object_id', (string) $term_id );
+			}
+		}
+	}
+
+	/**
 	 * Final step: recounts the term, announces it and empties the trash item.
 	 *
 	 * @param int                  $item_id  Trash item ID.
@@ -535,6 +612,19 @@ final class Restorer implements Service {
 	 */
 	private function finish( int $item_id, Snapshot $snapshot, array $state ): void {
 		wp_update_term_count_now( array( (int) $state['tt_id'] ), $snapshot->taxonomy );
+		if ( ! empty( $state['target_tt_id'] ) && get_term_by( 'term_taxonomy_id', (int) $state['target_tt_id'], $snapshot->taxonomy ) ) {
+			wp_update_term_count_now( array( (int) $state['target_tt_id'] ), $snapshot->taxonomy );
+
+			/**
+			 * Fires once a merge is undone: the source term is back on all its objects.
+			 *
+			 * @param int      $term_id   Restored source term ID.
+			 * @param int      $target_id Term ID the source was merged into.
+			 * @param string   $taxonomy  Taxonomy name.
+			 * @param Snapshot $snapshot  What was saved when the source was merged away.
+			 */
+			do_action( 'axle_category_tag_trash_merge_undone', (int) $state['term_id'], (int) ( $state['target_id'] ?? 0 ), $snapshot->taxonomy, $snapshot );
+		}
 
 		/**
 		 * Fires once every object of a restored term is re-attached.
