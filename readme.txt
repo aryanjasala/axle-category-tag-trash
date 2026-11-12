@@ -44,6 +44,8 @@ Free and open source under the GPL. No pro version, no upsells, no ads in wp-adm
 
 **Try it before you install.** [try.axlewp.com/axle-category-tag-trash](https://try.axlewp.com/axle-category-tag-trash) opens a private WordPress in your browser with this plugin and some demo content.
 
+**Every hook and WP-CLI command** is in the [guide on axlewp.com](https://axlewp.com/docs/axle-category-tag-trash/).
+
 Part of [Axle](https://axlewp.com/) by AryanX, a family of free plugins for running WordPress sites safely.
 
 == Frequently Asked Questions ==

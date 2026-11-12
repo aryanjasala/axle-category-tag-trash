@@ -1,13 +1,13 @@
 <?php
 /**
  * Plugin Name:       Axle Category & Tag Trash
- * Plugin URI:        https://wordpress.org/plugins/axle-category-tag-trash/
+ * Plugin URI:        https://axlewp.com/plugins/axle-category-tag-trash/
  * Description:       Deleted categories, tags and custom terms go to a trash instead of disappearing. Undo a delete in one click, or restore later with the term's posts, child terms and menu links.
  * Version:           3.0.0
  * Requires at least: 6.6
  * Requires PHP:      7.4
  * Author:            Aryan Jasala
- * Author URI:        https://profiles.wordpress.org/aryanjasala/
+ * Author URI:        https://axlewp.com/about/
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       axle-category-tag-trash
