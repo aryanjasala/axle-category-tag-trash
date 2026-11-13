@@ -9,6 +9,7 @@ namespace AryanX\Axle\CategoryTagTrash\Tests\Unit;
 
 use AryanX\Axle\CategoryTagTrash\Abilities;
 use AryanX\Axle\CategoryTagTrash\Merger;
+use AryanX\Axle\CategoryTagTrash\Redirects;
 use AryanX\Axle\CategoryTagTrash\Restorer;
 use AryanX\Axle\CategoryTagTrash\Settings;
 use AryanX\Axle\CategoryTagTrash\Trash;
@@ -187,7 +188,7 @@ final class MergerTest extends TestCase {
 
 	public function test_a_user_who_manages_tags_but_not_a_custom_taxonomy_cannot_list_or_merge_it(): void {
 		$trash     = new Trash( new Settings() );
-		$abilities = new Abilities( $trash, new Restorer( $trash ), $this->merger() );
+		$abilities = new Abilities( $trash, new Restorer( $trash ), $this->merger(), new Redirects() );
 
 		$this->assertTrue( $abilities->can_merge( array( 'taxonomy' => 'category', 'source' => 2, 'target' => 3 ) ) );
 		$this->assertFalse( $abilities->can_merge( array( 'taxonomy' => 'product_brand', 'source' => 2, 'target' => 3 ) ) );
@@ -199,7 +200,7 @@ final class MergerTest extends TestCase {
 
 	public function test_merging_needs_the_right_to_delete_the_source_and_edit_the_target(): void {
 		$trash     = new Trash( new Settings() );
-		$abilities = new Abilities( $trash, new Restorer( $trash ), $this->merger() );
+		$abilities = new Abilities( $trash, new Restorer( $trash ), $this->merger(), new Redirects() );
 		$input     = array(
 			'taxonomy' => 'category',
 			'source'   => 2,

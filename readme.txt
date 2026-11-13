@@ -29,7 +29,9 @@ Keeping the same ID matters: navigation blocks, widgets and shortcodes that poin
 
 **Merge** terms when you have the same thing twice: "WordPress", "wordpress" and "Word Press" as three tags. Choose "Merge into..." on a term, or in the bulk actions, pick the term to keep and read the preview. Every post of the old term moves to the one you kept, and the old term goes to the trash. If it was the wrong call, "Undo merge" brings the old term back on all its posts and takes the other term off only the posts that got it through the merge. Posts that already had both keep both. Big merges run in the background with a progress bar.
 
-Who can do what follows the taxonomy's own capabilities. A user who manages tags but not a custom taxonomy never sees, restores, deletes or merges that taxonomy's terms, on the screen or through the Abilities API.
+**Old links keep working.** Change a category's slug, move it under another parent, or merge it, and its old address sends visitors and search engines to the new one with a 301 redirect, instead of a 404. Feeds and numbered pages of the old address are sent along. The **Redirects** tab on Tools > Axle Category & Tag Trash lists each old address with its new address, why it redirects, since when and how many times it was used. Remove one and use Undo if that was a mistake. To redirect a term you are about to delete, pick a target under "If this term is deleted" on its edit screen. If you rename a term twice, the first old address goes straight to the last one, so redirects never chain.
+
+Who can do what follows the taxonomy's own capabilities. A user who manages tags but not a custom taxonomy never sees, restores, deletes, merges or redirects that taxonomy's terms, on the screen or through the Abilities API.
 
 Works with categories, tags, WooCommerce product categories and attributes, and any custom taxonomy that has an admin screen.
 
@@ -39,6 +41,7 @@ Free and open source under the GPL. No pro version, no upsells, no ads in wp-adm
 
 * **Tools > Axle Category & Tag Trash** lists deleted terms with what they were attached to, who deleted them and when. Filter by taxonomy, search, restore or delete in bulk, see exactly which posts, child terms and menus a restore brings back, and empty the trash.
 * Every category and tag screen has a link to it under the list, and "Merge into..." in each row and in the bulk actions.
+* The **Redirects** tab on the same screen lists the old term addresses that redirect.
 * The Plugins screen has an "Open the trash" link in this plugin's row.
 
 = WP-CLI =
@@ -47,6 +50,7 @@ Free and open source under the GPL. No pro version, no upsells, no ads in wp-adm
 * `wp axle-category-tag-trash merge <source> <target> --taxonomy=post_tag` (add `--dry-run` to preview)
 * `wp axle-category-tag-trash restore <id>...`
 * `wp axle-category-tag-trash delete <id>...` or `wp axle-category-tag-trash delete --all`
+* `wp axle-category-tag-trash redirects list` and `wp axle-category-tag-trash redirects remove <old-path>...`
 
 **Try it before you install.** [try.axlewp.com/axle-category-tag-trash](https://try.axlewp.com/axle-category-tag-trash) opens a private WordPress in your browser with this plugin and some demo content.
 
@@ -62,7 +66,19 @@ Posts, pages and other items of the old term get the term you kept. The name, sl
 
 Yes, for as long as the old term is in the trash. Choose "Undo merge" on it. The default term (Uncategorized) cannot be merged away, and a taxonomy you left out of the trash cannot be merged, because it could not be undone.
 
-= What happens if a new term uses the old slug? =
+= When does an old term address redirect? =
+
+When a term's slug changes, when its parent (or a parent's slug) changes so that its address changes, when it is merged into another term, and when it is deleted with a target chosen under "If this term is deleted". A term deleted without a target shows a 404, as WordPress does. Redirects need pretty permalinks.
+
+= What if a new term takes the old slug? =
+
+The new term wins. A redirect only runs when the old address would not show a real term archive, so a new term with the old slug is shown as it is. Use the Redirects tab to remove the old redirect.
+
+= Do redirects slow my site down? =
+
+No. They are stored in two options that WordPress does not load on a normal page load, and they are only read on a request that is a 404, a feed of a term that does not exist, or a term archive opened at an address that is not its own.
+
+= What happens if a new term uses the old slug on restore? =
 
 The restored term gets a unique slug instead, and Axle Category & Tag Trash tells you which one.
 

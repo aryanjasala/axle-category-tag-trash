@@ -24,13 +24,19 @@ final class Access {
 	public const MERGE   = 'merge';
 
 	/**
+	 * Changing or removing the redirects of a taxonomy's terms.
+	 */
+	public const REDIRECTS = 'redirects';
+
+	/**
 	 * Taxonomy capabilities each kind of access needs, all of them.
 	 */
 	private const NEEDS = array(
-		self::LIST    => array( 'manage_terms' ),
-		self::RESTORE => array( 'manage_terms', 'edit_terms' ),
-		self::DELETE  => array( 'manage_terms', 'delete_terms' ),
-		self::MERGE   => array( 'manage_terms', 'edit_terms', 'delete_terms' ),
+		self::LIST      => array( 'manage_terms' ),
+		self::RESTORE   => array( 'manage_terms', 'edit_terms' ),
+		self::DELETE    => array( 'manage_terms', 'delete_terms' ),
+		self::MERGE     => array( 'manage_terms', 'edit_terms', 'delete_terms' ),
+		self::REDIRECTS => array( 'manage_terms', 'edit_terms' ),
 	);
 
 	/**
@@ -47,7 +53,7 @@ final class Access {
 	 * Whether the current user may do something with terms of a taxonomy.
 	 *
 	 * @param string $taxonomy Taxonomy name, already cleaned or not.
-	 * @param string $context  LIST, RESTORE, DELETE or MERGE.
+	 * @param string $context  LIST, RESTORE, DELETE, MERGE or REDIRECTS.
 	 * @return bool
 	 */
 	public static function can( string $taxonomy, string $context = self::LIST ): bool {
@@ -62,7 +68,7 @@ final class Access {
 			}
 		} else {
 			// A taxonomy that is not registered (its plugin is off) has no capabilities of its own.
-			$allowed = '' !== $taxonomy && ( self::LIST === $context || self::DELETE === $context ) && current_user_can( 'manage_options' );
+			$allowed = '' !== $taxonomy && in_array( $context, array( self::LIST, self::DELETE, self::REDIRECTS ), true ) && current_user_can( 'manage_options' );
 		}
 
 		/**
@@ -74,7 +80,7 @@ final class Access {
 		 *
 		 * @param bool   $allowed  Whether the user's own capabilities for the taxonomy allow it.
 		 * @param string $taxonomy Taxonomy name.
-		 * @param string $context  list, restore, delete or merge.
+		 * @param string $context  list, restore, delete, merge or redirects.
 		 * @param int    $user_id  Current user ID.
 		 */
 		$allowed = (bool) apply_filters( 'axle_category_tag_trash_can_access_taxonomy', $allowed, $taxonomy, $context, get_current_user_id() );
@@ -87,7 +93,7 @@ final class Access {
 	 * The taxonomies from a list that the current user may use.
 	 *
 	 * @param string[] $taxonomies Taxonomy names.
-	 * @param string   $context    LIST, RESTORE, DELETE or MERGE.
+	 * @param string   $context    LIST, RESTORE, DELETE, MERGE or REDIRECTS.
 	 * @return string[]
 	 */
 	public static function filter( array $taxonomies, string $context = self::LIST ): array {

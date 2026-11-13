@@ -55,6 +55,13 @@ final class Plugin {
 	private Merger $merger;
 
 	/**
+	 * Old term addresses that redirect.
+	 *
+	 * @var Redirects
+	 */
+	private Redirects $redirects;
+
+	/**
 	 * Starts the plugin. Runs on `plugins_loaded`.
 	 */
 	public static function boot(): void {
@@ -81,6 +88,8 @@ final class Plugin {
 		$this->restorer = new Restorer( $this->trash );
 		$this->purger   = new Purger( $this->trash );
 		$this->merger   = new Merger( $this->trash );
+
+		$this->redirects = new Redirects();
 	}
 
 	/**
@@ -111,6 +120,15 @@ final class Plugin {
 	}
 
 	/**
+	 * Redirects, for other plugins.
+	 *
+	 * @return Redirects
+	 */
+	public function redirects(): Redirects {
+		return $this->redirects;
+	}
+
+	/**
 	 * Registers the services.
 	 */
 	private function register(): void {
@@ -120,9 +138,10 @@ final class Plugin {
 			new Snapshotter( $this->trash ),
 			$this->purger,
 			$this->merger,
-			new TrashPage( $this->trash, $this->restorer, $this->purger, $this->merger ),
+			$this->redirects,
+			new TrashPage( $this->trash, $this->restorer, $this->purger, $this->merger, $this->redirects ),
 			new TermScreen( $this->trash, $this->restorer ),
-			new Abilities( $this->trash, $this->restorer, $this->merger ),
+			new Abilities( $this->trash, $this->restorer, $this->merger, $this->redirects ),
 			new SiteHealth( $this->trash, $this->merger ),
 		);
 
@@ -131,7 +150,7 @@ final class Plugin {
 		}
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			\WP_CLI::add_command( 'axle-category-tag-trash', new Command( $this->trash, $this->restorer, $this->purger, $this->merger ) );
+			\WP_CLI::add_command( 'axle-category-tag-trash', new Command( $this->trash, $this->restorer, $this->purger, $this->merger, $this->redirects ) );
 		}
 	}
 }

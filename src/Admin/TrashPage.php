@@ -10,6 +10,7 @@ namespace AryanX\Axle\CategoryTagTrash\Admin;
 use AryanX\Axle\CategoryTagTrash\Access;
 use AryanX\Axle\CategoryTagTrash\Merger;
 use AryanX\Axle\CategoryTagTrash\Purger;
+use AryanX\Axle\CategoryTagTrash\Redirects;
 use AryanX\Axle\CategoryTagTrash\Restorer;
 use AryanX\Axle\CategoryTagTrash\Service;
 use AryanX\Axle\CategoryTagTrash\Settings;
@@ -56,18 +57,27 @@ final class TrashPage implements Service {
 	private Merger $merger;
 
 	/**
+	 * The Redirects tab.
+	 *
+	 * @var RedirectsTab
+	 */
+	private RedirectsTab $redirects_tab;
+
+	/**
 	 * Sets up the screen.
 	 *
-	 * @param Trash    $trash    Trashed terms.
-	 * @param Restorer $restorer Restore logic.
-	 * @param Purger   $purger   Purging and emptying.
-	 * @param Merger   $merger   Merging terms.
+	 * @param Trash     $trash     Trashed terms.
+	 * @param Restorer  $restorer  Restore logic.
+	 * @param Purger    $purger    Purging and emptying.
+	 * @param Merger    $merger    Merging terms.
+	 * @param Redirects $redirects Old term addresses that redirect.
 	 */
-	public function __construct( Trash $trash, Restorer $restorer, Purger $purger, Merger $merger ) {
-		$this->trash    = $trash;
-		$this->restorer = $restorer;
-		$this->purger   = $purger;
-		$this->merger   = $merger;
+	public function __construct( Trash $trash, Restorer $restorer, Purger $purger, Merger $merger, Redirects $redirects ) {
+		$this->redirects_tab = new RedirectsTab( $redirects );
+		$this->trash         = $trash;
+		$this->restorer      = $restorer;
+		$this->purger        = $purger;
+		$this->merger        = $merger;
 	}
 
 	/**
@@ -90,6 +100,7 @@ final class TrashPage implements Service {
 	 * Adds the menu entry and the action handler.
 	 */
 	public function register(): void {
+		$this->redirects_tab->register();
 		add_action( 'admin_menu', array( $this, 'add_page' ) );
 		add_action( 'admin_post_' . self::ACTION, array( $this, 'handle_action' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( PLUGIN_FILE ), array( $this, 'action_links' ) );
@@ -205,6 +216,11 @@ final class TrashPage implements Service {
 					'content' => '<p>' . esc_html__( 'To merge terms, choose "Merge into…" on a term or in the bulk actions of Categories, Tags or another term screen. Pick the term to keep and check the preview. The merged-away term lands here.', 'axle-category-tag-trash' ) . '</p><p>' . esc_html__( 'Choose "Undo merge" on it to bring it back. The term you merged into comes off only the posts that got it through the merge. Posts that already had both keep both.', 'axle-category-tag-trash' ) . '</p>',
 				),
 				array(
+					'id'      => 'redirects',
+					'title'   => __( 'Redirects', 'axle-category-tag-trash' ),
+					'content' => '<p>' . esc_html__( 'When you change the slug of a category or tag, merge it into another, or delete it with a redirect target, its old address is sent to the new one with a 301 redirect. It only happens when the old address would be a 404, so a new term that takes the old slug wins.', 'axle-category-tag-trash' ) . '</p><p>' . esc_html__( 'The Redirects tab lists each old address with how many times it was used. Remove one to show a 404 again, and use Undo right after if that was a mistake. To redirect a term you plan to delete, pick a target under "If this term is deleted" on its edit screen.', 'axle-category-tag-trash' ) . '</p>',
+				),
+				array(
 					'id'      => 'retention',
 					'title'   => __( 'Retention and emptying', 'axle-category-tag-trash' ),
 					'content' => '<p>' . esc_html__( 'Terms are deleted for good after the number of days set under Retention. "Empty trash" and "Delete permanently" do it now. Neither can be undone.', 'axle-category-tag-trash' ) . '</p>',
@@ -247,8 +263,14 @@ final class TrashPage implements Service {
 			<hr class="wp-header-end">
 
 			<?php
+			if ( 'merge' !== $view ) {
+				$this->render_tabs( 'redirects' === $view ? 'redirects' : 'trash' );
+			}
+
 			if ( 'merge' === $view ) {
 				$this->render_merge();
+			} elseif ( 'redirects' === $view ) {
+				$this->redirects_tab->render();
 			} else {
 				$this->render_trash();
 			}
@@ -257,6 +279,30 @@ final class TrashPage implements Service {
 			?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Prints the tabs: the trash and the redirects.
+	 *
+	 * @param string $current trash or redirects.
+	 */
+	private function render_tabs( string $current ): void {
+		$tabs = array(
+			'trash'     => array( __( 'Trash', 'axle-category-tag-trash' ), admin_url( 'tools.php?page=' . self::SLUG ) ),
+			'redirects' => array( __( 'Redirects', 'axle-category-tag-trash' ), RedirectsTab::url() ),
+		);
+
+		echo '<nav class="nav-tab-wrapper" aria-label="' . esc_attr__( 'Sections', 'axle-category-tag-trash' ) . '">';
+		foreach ( $tabs as $id => $tab ) {
+			printf(
+				'<a href="%1$s" class="nav-tab%2$s"%3$s>%4$s</a>',
+				esc_url( $tab[1] ),
+				$id === $current ? ' nav-tab-active' : '',
+				$id === $current ? ' aria-current="page"' : '',
+				esc_html( $tab[0] )
+			);
+		}
+		echo '</nav>';
 	}
 
 	/**
@@ -655,6 +701,9 @@ final class TrashPage implements Service {
 				<li><?php esc_html_e( 'The name, slug, description and meta of the term you keep do not change. The merged-away terms keep theirs in the trash for Undo.', 'axle-category-tag-trash' ); ?></li>
 				<li><?php esc_html_e( 'Posts that already have both terms keep one copy of the target.', 'axle-category-tag-trash' ); ?></li>
 				<li><?php esc_html_e( 'Menu links to a merged-away term point at the term you keep.', 'axle-category-tag-trash' ); ?></li>
+				<?php if ( Redirects::enabled() && Redirects::supports( $taxonomy ) ) : ?>
+					<li><?php esc_html_e( 'The archive address of a merged-away term redirects to the term you keep, including its feed and numbered pages.', 'axle-category-tag-trash' ); ?></li>
+				<?php endif; ?>
 			</ul>
 		</section>
 
@@ -923,6 +972,11 @@ final class TrashPage implements Service {
 			$this->trash->settings()->set_retention_days( isset( $_POST['retention_days'] ) ? absint( $_POST['retention_days'] ) : 30 );
 			wp_safe_redirect( add_query_arg( 'actt_saved', '1', $back ) );
 			exit;
+		}
+
+		if ( in_array( $task, array( 'redirect_remove', 'redirect_undo' ), true ) ) {
+			check_admin_referer( self::ACTION . '_' . $task . '_' . $items );
+			$this->redirects_tab->handle( $task, $items );
 		}
 
 		if ( 'merge' === $task ) {

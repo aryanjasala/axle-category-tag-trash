@@ -43,16 +43,25 @@ final class Abilities implements Service {
 	private Merger $merger;
 
 	/**
+	 * Old term addresses that redirect.
+	 *
+	 * @var Redirects
+	 */
+	private Redirects $redirects;
+
+	/**
 	 * Sets up the abilities.
 	 *
-	 * @param Trash    $trash    Trashed terms.
-	 * @param Restorer $restorer Restore logic.
-	 * @param Merger   $merger   Merge logic.
+	 * @param Trash     $trash     Trashed terms.
+	 * @param Restorer  $restorer  Restore logic.
+	 * @param Merger    $merger    Merge logic.
+	 * @param Redirects $redirects Redirects.
 	 */
-	public function __construct( Trash $trash, Restorer $restorer, Merger $merger ) {
-		$this->trash    = $trash;
-		$this->restorer = $restorer;
-		$this->merger   = $merger;
+	public function __construct( Trash $trash, Restorer $restorer, Merger $merger, Redirects $redirects ) {
+		$this->redirects = $redirects;
+		$this->trash     = $trash;
+		$this->restorer  = $restorer;
+		$this->merger    = $merger;
 	}
 
 	/**
@@ -295,6 +304,106 @@ final class Abilities implements Service {
 				'idempotent'  => false,
 			)
 		);
+
+		$this->ability(
+			'list-redirects',
+			__( 'List redirects from old term addresses', 'axle-category-tag-trash' ),
+			__( 'The old archive addresses of categories, tags and other terms that redirect to the term\'s current address, newest first, with how many times each was used. Only taxonomies the user may manage are included.', 'axle-category-tag-trash' ),
+			array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'taxonomy' => array(
+						'type'        => 'string',
+						'description' => __( 'Only this taxonomy, such as category or post_tag.', 'axle-category-tag-trash' ),
+					),
+					'search'   => array(
+						'type'        => 'string',
+						'description' => __( 'The old or new address, or the term name, contains this text.', 'axle-category-tag-trash' ),
+					),
+					'limit'    => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+						'maximum' => 100,
+						'default' => 20,
+					),
+					'page'     => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+						'default' => 1,
+					),
+				),
+				'additionalProperties' => false,
+				'default'              => array(),
+			),
+			array(
+				'type'       => 'object',
+				'properties' => array(
+					'total' => array( 'type' => 'integer' ),
+					'items' => array(
+						'type'  => 'array',
+						'items' => array(
+							'type'       => 'object',
+							'properties' => array(
+								'path'        => array(
+									'type'        => 'string',
+									'description' => __( 'Old path relative to the site address. Pass it to remove-redirect.', 'axle-category-tag-trash' ),
+								),
+								'old_url'     => array( 'type' => 'string' ),
+								'new_url'     => array(
+									'type'        => 'string',
+									'description' => __( 'Where it redirects now. Empty when the target term was deleted.', 'axle-category-tag-trash' ),
+								),
+								'taxonomy'    => array( 'type' => 'string' ),
+								'term_id'     => array( 'type' => 'integer' ),
+								'kind'        => array(
+									'type' => 'string',
+									'enum' => array( Redirects::KIND_RENAME, Redirects::KIND_MOVE, Redirects::KIND_MERGE, Redirects::KIND_TRASH ),
+								),
+								'hits'        => array( 'type' => 'integer' ),
+								'created'     => array( 'type' => 'string' ),
+								'target_gone' => array( 'type' => 'boolean' ),
+							),
+						),
+					),
+				),
+			),
+			array( $this, 'list_redirects' ),
+			array( $this, 'can_list' ),
+			array(
+				'readonly'   => true,
+				'idempotent' => true,
+			)
+		);
+
+		$this->ability(
+			'remove-redirect',
+			__( 'Remove a redirect from an old term address', 'axle-category-tag-trash' ),
+			__( 'Stops an old term address from redirecting, so it shows a 404 again. Use the path from list-redirects. It cannot be undone through this ability; merging or renaming the term again adds a redirect back.', 'axle-category-tag-trash' ),
+			array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'path' => array(
+						'type'        => 'string',
+						'description' => __( 'Old path from axle-category-tag-trash/list-redirects, such as topics/seo.', 'axle-category-tag-trash' ),
+					),
+				),
+				'required'             => array( 'path' ),
+				'additionalProperties' => false,
+			),
+			array(
+				'type'       => 'object',
+				'properties' => array(
+					'removed' => array( 'type' => 'boolean' ),
+				),
+			),
+			array( $this, 'remove_redirect' ),
+			array( $this, 'can_remove_redirect' ),
+			array(
+				'readonly'    => false,
+				'destructive' => true,
+				'idempotent'  => true,
+			)
+		);
 	}
 
 	/**
@@ -395,6 +504,85 @@ final class Abilities implements Service {
 			Access::taxonomy_name( $input['taxonomy'] ?? '' ),
 			array( 'children' => (string) ( $input['children'] ?? '' ) )
 		);
+	}
+
+	/**
+	 * Ability: redirects from old term addresses.
+	 *
+	 * @param array|null $input Ability input.
+	 * @return array{total: int, items: array[]}|\WP_Error
+	 */
+	public function list_redirects( $input = null ) {
+		$input    = (array) $input;
+		$taxonomy = Access::taxonomy_name( $input['taxonomy'] ?? '' );
+
+		if ( '' !== $taxonomy && ! Access::can( $taxonomy, Access::LIST ) ) {
+			return new \WP_Error( 'axle_category_tag_trash_forbidden', __( 'Sorry, you are not allowed to see redirects of this taxonomy.', 'axle-category-tag-trash' ), array( 'status' => 403 ) );
+		}
+
+		$found = Redirects::find(
+			array(
+				'taxonomy' => $taxonomy,
+				'search'   => sanitize_text_field( (string) ( $input['search'] ?? '' ) ),
+				'per_page' => max( 1, min( 100, (int) ( $input['limit'] ?? 20 ) ) ),
+				'page'     => max( 1, (int) ( $input['page'] ?? 1 ) ),
+			)
+		);
+
+		$items = array();
+		foreach ( $found['items'] as $row ) {
+			$items[] = array(
+				'path'        => $row['path'],
+				'old_url'     => $row['old_url'],
+				'new_url'     => $row['new_url'],
+				'taxonomy'    => $row['taxonomy'],
+				'term_id'     => $row['term_id'],
+				'kind'        => $row['kind'],
+				'hits'        => $row['hits'],
+				'created'     => gmdate( 'c', (int) $row['created'] ),
+				'target_gone' => $row['target_gone'],
+			);
+		}
+
+		return array(
+			'total' => $found['total'],
+			'items' => $items,
+		);
+	}
+
+	/**
+	 * Ability: removes a redirect.
+	 *
+	 * @param array|null $input Ability input.
+	 * @return array{removed: bool}|\WP_Error
+	 */
+	public function remove_redirect( $input = null ) {
+		$key   = Redirects::resolve_key( (string) ( ( (array) $input )['path'] ?? '' ) );
+		$entry = '' !== $key ? ( Redirects::all()[ $key ] ?? null ) : null;
+
+		if ( $entry && ! Access::can( $entry['taxonomy'], Access::REDIRECTS ) ) {
+			return new \WP_Error( 'axle_category_tag_trash_forbidden', __( 'Sorry, you are not allowed to remove redirects of this taxonomy.', 'axle-category-tag-trash' ), array( 'status' => 403 ) );
+		}
+
+		return array( 'removed' => (bool) $this->redirects->remove( '' !== $key ? array( $key ) : array() ) );
+	}
+
+	/**
+	 * Permission to remove a redirect: the screen's capability, and the right to change the redirect's own taxonomy.
+	 *
+	 * @param array|null $input Ability input.
+	 * @return bool
+	 */
+	public function can_remove_redirect( $input = null ): bool {
+		if ( ! current_user_can( TrashPage::capability() ) ) {
+			return false;
+		}
+
+		$key   = Redirects::resolve_key( (string) ( ( (array) $input )['path'] ?? '' ) );
+		$entry = '' !== $key ? ( Redirects::all()[ $key ] ?? null ) : null;
+
+		// A redirect that is already gone is reported by the ability itself.
+		return ! $entry || Access::can( $entry['taxonomy'], Access::REDIRECTS );
 	}
 
 	/**
