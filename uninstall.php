@@ -16,6 +16,9 @@ function axle_category_tag_trash_uninstall_site(): void {
 	wp_clear_scheduled_hook( 'axle_category_tag_trash_purge' );
 	wp_clear_scheduled_hook( 'axle_category_tag_trash_empty' );
 	delete_option( 'axle_category_tag_trash_settings' );
+	delete_option( 'axle_category_tag_trash_redirects' );
+	delete_option( 'axle_category_tag_trash_redirect_hits' );
+	delete_metadata( 'term', 0, 'axle_category_tag_trash_redirect_to', '', true );
 
 	do {
 		$axle_category_tag_trash_items = get_posts(
@@ -37,6 +40,10 @@ function axle_category_tag_trash_uninstall_site(): void {
 	// Locks left behind by an interrupted background restore.
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- One-off cleanup on uninstall.
 	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( 'axle_category_tag_trash_lock_' ) . '%' ) );
+
+	// Undo links for removed redirects, and their expiry times.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- One-off cleanup on uninstall.
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s", $wpdb->esc_like( '_transient_axle_category_tag_trash_redirect_undo_' ) . '%', $wpdb->esc_like( '_transient_timeout_axle_category_tag_trash_redirect_undo_' ) . '%' ) );
 }
 
 if ( is_multisite() ) {

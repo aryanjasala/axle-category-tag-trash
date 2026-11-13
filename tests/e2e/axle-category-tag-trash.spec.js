@@ -119,12 +119,12 @@ test.describe( 'Axle Category & Tag Trash', () => {
 		await expect( page ).toHaveURL( /page=axle-category-tag-trash/ );
 		await expect( page.getByRole( 'heading', { level: 1 } ) ).toHaveText( 'Category & Tag Trash' );
 
-		await expect( page.locator( '.axle-time' ).first() ).toHaveText( /Just now|minute/ );
+		await expect( page.locator( '.axle-time' ).first() ).toHaveText( /just now|minute/ );
 		await expect( page.locator( '.axle-time' ).first() ).toHaveAttribute( 'datetime', /T/ );
 
 		await page.locator( '#contextual-help-link' ).click();
 		const tabs = page.locator( '#contextual-help-wrap .contextual-help-tabs' );
-		for ( const title of [ 'Overview', 'Restoring', 'Merging', 'Retention and emptying' ] ) {
+		for ( const title of [ 'Overview', 'Restoring', 'Merging', 'Redirects', 'Retention and emptying' ] ) {
 			await expect( tabs.locator( 'a', { hasText: title } ) ).toBeVisible();
 		}
 		await tabs.locator( 'a', { hasText: 'Merging' } ).click();
@@ -280,7 +280,7 @@ test.describe( 'Axle Category & Tag Trash', () => {
 		const path = ( name ) => `/wp-abilities/v1/abilities/axle-category-tag-trash/${ name }/run`;
 
 		const listed = await rest( 'GET', '/wp-abilities/v1/abilities?category=axle-category-tag-trash' );
-		expect( listed.body.map( ( ability ) => ability.name ).sort() ).toEqual( [ 'axle-category-tag-trash/delete', 'axle-category-tag-trash/list', 'axle-category-tag-trash/merge', 'axle-category-tag-trash/preview-merge', 'axle-category-tag-trash/restore' ] );
+		expect( listed.body.map( ( ability ) => ability.name ).sort() ).toEqual( [ 'axle-category-tag-trash/delete', 'axle-category-tag-trash/list', 'axle-category-tag-trash/list-redirects', 'axle-category-tag-trash/merge', 'axle-category-tag-trash/preview-merge', 'axle-category-tag-trash/remove-redirect', 'axle-category-tag-trash/restore' ] );
 		// MCP clients only list abilities marked public.
 		expect( JSON.parse( wpEval( `echo wp_json_encode( array_values( array_filter( array_map( function ( $ability ) { $meta = $ability->get_meta(); return ( ! empty( $meta['public'] ) && ! empty( $meta['mcp']['public'] ) ) ? '' : $ability->get_name(); }, wp_get_abilities() ), function ( $name ) { return 0 === strpos( $name, 'axle-category-tag-trash/' ); } ) ) );` ) ) ).toEqual( [] );
 

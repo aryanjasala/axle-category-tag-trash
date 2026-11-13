@@ -492,6 +492,219 @@
           "--yes"
         ]
       ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash > Redirects, empty",
+      "setup": [
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirects"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirect_hits"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&view=redirects"
+    },
+    {
+      "name": "Tools > Category & Tag Trash > Redirects with an old address",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y redirect",
+            "--porcelain"
+          ],
+          "save": "rt"
+        },
+        [
+          "term",
+          "update",
+          "category",
+          "{rt}",
+          "--slug=a11y-redirect-new"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&view=redirects",
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "category",
+          "{rt}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirects"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirect_hits"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash > Redirects with a remove confirm open",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y redirect",
+            "--porcelain"
+          ],
+          "save": "rt"
+        },
+        [
+          "term",
+          "update",
+          "category",
+          "{rt}",
+          "--slug=a11y-redirect-new"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&view=redirects",
+      "steps": [
+        {
+          "click": ".actt-delete"
+        },
+        {
+          "waitFor": ".actt-row-confirm"
+        }
+      ],
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "category",
+          "{rt}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirects"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirect_hits"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash > Redirects after a removal, with Undo",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y redirect",
+            "--porcelain"
+          ],
+          "save": "rt"
+        },
+        [
+          "term",
+          "update",
+          "category",
+          "{rt}",
+          "--slug=a11y-redirect-new"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&view=redirects",
+      "steps": [
+        {
+          "click": ".actt-delete"
+        },
+        {
+          "click": ".actt-row-confirm a.button"
+        },
+        {
+          "waitFor": ".notice-success"
+        }
+      ],
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "category",
+          "{rt}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirects"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirect_hits"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash > Redirects with an error notice",
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&view=redirects&actt_redirect_error=There%20is%20nothing%20to%20undo."
+    },
+    {
+      "name": "Category edit screen with the if deleted field",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y edit field",
+            "--porcelain"
+          ],
+          "save": "ef"
+        }
+      ],
+      "url": "/wp-admin/term.php?taxonomy=category&tag_ID={ef}",
+      "include": [
+        "#axle_category_tag_trash_redirect_to"
+      ],
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "category",
+          "{ef}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ]
+      ]
     }
   ],
   "skip": {}

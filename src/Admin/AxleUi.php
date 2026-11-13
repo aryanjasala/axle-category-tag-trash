@@ -60,7 +60,7 @@ final class AxleUi {
 		$span = human_time_diff( $timestamp, $now );
 
 		if ( abs( $now - $timestamp ) < MINUTE_IN_SECONDS ) {
-			$text = __( 'Just now', 'axle-category-tag-trash' );
+			$text = __( 'just now', 'axle-category-tag-trash' );
 		} elseif ( $timestamp > $now ) {
 			/* translators: %s: a time span such as "5 minutes". */
 			$text = sprintf( __( 'in %s', 'axle-category-tag-trash' ), $span );

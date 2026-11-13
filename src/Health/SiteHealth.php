@@ -8,6 +8,7 @@
 namespace AryanX\Axle\CategoryTagTrash\Health;
 
 use AryanX\Axle\CategoryTagTrash\Merger;
+use AryanX\Axle\CategoryTagTrash\Redirects;
 use AryanX\Axle\CategoryTagTrash\Restorer;
 use AryanX\Axle\CategoryTagTrash\Service;
 use AryanX\Axle\CategoryTagTrash\Trash;
@@ -63,6 +64,11 @@ final class SiteHealth implements Service {
 		$tests['direct']['axle_category_tag_trash_jobs'] = array(
 			'label' => __( 'Axle Category & Tag Trash background jobs', 'axle-category-tag-trash' ),
 			'test'  => array( $this, 'run' ),
+		);
+
+		$tests['direct']['axle_category_tag_trash_redirects'] = array(
+			'label' => __( 'Axle Category & Tag Trash redirects', 'axle-category-tag-trash' ),
+			'test'  => array( $this, 'run_redirects' ),
 		);
 
 		return $tests;
@@ -157,6 +163,44 @@ final class SiteHealth implements Service {
 			)
 		) . '</p><p>' . esc_html__( 'WP-Cron may be switched off or blocked. Run the job from the command line to finish it.', 'axle-category-tag-trash' ) . '</p>';
 		$result['actions'] = '<p><code>wp axle-category-tag-trash merge</code> &middot; <code>wp axle-category-tag-trash restore</code></p>';
+
+		return $result;
+	}
+
+	/**
+	 * Site Health test for redirects whose target term was deleted.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function run_redirects(): array {
+		$broken = Redirects::enabled() ? Redirects::count_broken() : 0;
+
+		$result = array(
+			'label'       => __( 'Every redirect from an old term address leads to a term', 'axle-category-tag-trash' ),
+			'status'      => 'good',
+			'badge'       => array(
+				'label' => __( 'Terms', 'axle-category-tag-trash' ),
+				'color' => 'blue',
+			),
+			'description' => '<p>' . esc_html__( 'Old category, tag and term addresses that redirect all lead to a term that still exists.', 'axle-category-tag-trash' ) . '</p>',
+			'actions'     => '',
+			'test'        => 'axle_category_tag_trash_redirects',
+		);
+
+		if ( ! $broken ) {
+			return $result;
+		}
+
+		$result['status']      = 'recommended';
+		$result['label']       = __( 'Some redirects from old term addresses lead nowhere', 'axle-category-tag-trash' );
+		$result['description'] = '<p>' . esc_html(
+			sprintf(
+				/* translators: %s: number of redirects. */
+				_n( '%s redirect points at a term that was deleted, so its old address shows a 404.', '%s redirects point at terms that were deleted, so their old addresses show a 404.', $broken, 'axle-category-tag-trash' ),
+				number_format_i18n( $broken )
+			)
+		) . '</p><p>' . esc_html__( 'Restore the term from the trash and the redirect works again, or remove the redirect on the Redirects tab.', 'axle-category-tag-trash' ) . '</p>';
+		$result['actions'] = '<p><a href="' . esc_url( admin_url( 'tools.php?page=axle-category-tag-trash&view=redirects' ) ) . '">' . esc_html__( 'Open the Redirects tab', 'axle-category-tag-trash' ) . '</a></p>';
 
 		return $result;
 	}

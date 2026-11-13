@@ -156,6 +156,37 @@ add_action( "init", function () {
 		}
 	} );
 
+	test( 'redirects: the tab and the abilities only hold taxonomies the user may manage', async ( { browser } ) => {
+		wp( 'option', 'update', 'axle_category_tag_trash_redirects', JSON.stringify( {
+			'brand/old-acme': { taxonomy: 'ctt_brand', term: brandTerm, old_term: 0, kind: 'rename', created: 1000, chain: [] },
+			'tag/old-visible': { taxonomy: 'post_tag', term: tagTerm, old_term: 0, kind: 'rename', created: 2000, chain: [] },
+		} ), '--format=json' );
+
+		const { context, page } = await logInAs( browser, 'tagger', PASSWORD );
+		try {
+			await page.goto( `${ TRASH }&view=redirects` );
+			await expect( page.locator( '.actt-old' ) ).toHaveText( [ '/tag/old-visible/' ] );
+			await expect( page.locator( 'body' ) ).not.toContainText( 'old-acme' );
+		} finally {
+			await context.close();
+		}
+
+		if ( 'yes' === wpEval( "echo function_exists( 'wp_register_ability' ) ? 'yes' : 'no';" ) ) {
+			const client = await appPasswordClient( 'tagger', 'e2e-tagger-redirects' );
+			try {
+				const listed = await client.call( 'GET', path( 'list-redirects' ) );
+				expect( listed.status ).toBe( 200 );
+				expect( listed.body.items.map( ( item ) => item.path ) ).toEqual( [ 'tag/old-visible' ] );
+				expect( ( await client.call( 'GET', `${ path( 'list-redirects' ) }?input[taxonomy]=ctt_brand` ) ).status ).toBe( 403 );
+				expect( ( await client.call( 'DELETE', `${ path( 'remove-redirect' ) }?input[path]=brand/old-acme` ) ).status ).toBe( 403 );
+				expect( wp( 'axle-category-tag-trash', 'redirects', 'list', '--format=ids' ) ).toContain( 'brand/old-acme' );
+			} finally {
+				await client.dispose();
+			}
+		}
+		wp( 'option', 'delete', 'axle_category_tag_trash_redirects' );
+	} );
+
 	test( 'the filter can hide a taxonomy from everyone', async ( { browser } ) => {
 		const id = Number( wp( 'term', 'create', 'post_tag', 'Hidden by filter', '--porcelain' ) );
 		wp( 'term', 'delete', 'post_tag', String( id ) );

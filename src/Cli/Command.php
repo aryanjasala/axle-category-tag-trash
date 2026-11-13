@@ -10,6 +10,7 @@ namespace AryanX\Axle\CategoryTagTrash\Cli;
 use AryanX\Axle\CategoryTagTrash\Access;
 use AryanX\Axle\CategoryTagTrash\Merger;
 use AryanX\Axle\CategoryTagTrash\Purger;
+use AryanX\Axle\CategoryTagTrash\Redirects;
 use AryanX\Axle\CategoryTagTrash\Restorer;
 use AryanX\Axle\CategoryTagTrash\Trash;
 
@@ -49,18 +50,27 @@ final class Command {
 	private Merger $merger;
 
 	/**
+	 * Old term addresses that redirect.
+	 *
+	 * @var Redirects
+	 */
+	private Redirects $redirects;
+
+	/**
 	 * Sets up the command.
 	 *
-	 * @param Trash    $trash    Trashed terms.
-	 * @param Restorer $restorer Restore logic.
-	 * @param Purger   $purger   Purging and emptying.
-	 * @param Merger   $merger   Merging terms.
+	 * @param Trash     $trash     Trashed terms.
+	 * @param Restorer  $restorer  Restore logic.
+	 * @param Purger    $purger    Purging and emptying.
+	 * @param Merger    $merger    Merging terms.
+	 * @param Redirects $redirects Old term addresses that redirect.
 	 */
-	public function __construct( Trash $trash, Restorer $restorer, Purger $purger, Merger $merger ) {
-		$this->trash    = $trash;
-		$this->restorer = $restorer;
-		$this->purger   = $purger;
-		$this->merger   = $merger;
+	public function __construct( Trash $trash, Restorer $restorer, Purger $purger, Merger $merger, Redirects $redirects ) {
+		$this->redirects = $redirects;
+		$this->trash     = $trash;
+		$this->restorer  = $restorer;
+		$this->purger    = $purger;
+		$this->merger    = $merger;
 	}
 
 	/**
@@ -279,5 +289,98 @@ final class Command {
 				\WP_CLI::success( 'Deleted trash item ' . $item_id . '.' );
 			}
 		}
+	}
+
+	/**
+	 * Lists or removes the redirects from old term addresses.
+	 *
+	 * A redirect is added when a term's slug or parent changes, when a term is merged
+	 * away, and when a term with a redirect target is deleted. To set a target before
+	 * a delete, run `wp term meta update <term> axle_category_tag_trash_redirect_to <target-term-id>`.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <action>
+	 * : `list` shows the redirects, newest first. `remove` removes the ones named after it, by old path such as `topics/seo`.
+	 *
+	 * [<path>...]
+	 * : Old paths to remove.
+	 *
+	 * [--taxonomy=<taxonomy>]
+	 * : Only this taxonomy, for `list`.
+	 *
+	 * [--format=<format>]
+	 * : table, csv, json, count or ids (the old paths).
+	 * ---
+	 * default: table
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp axle-category-tag-trash redirects list --taxonomy=category
+	 *     wp axle-category-tag-trash redirects remove topics/seo
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Named arguments.
+	 */
+	public function redirects( array $args, array $assoc_args ): void {
+		$action = (string) array_shift( $args );
+
+		if ( 'remove' === $action ) {
+			$keys = array();
+			foreach ( $args as $path ) {
+				$key = Redirects::resolve_key( (string) $path );
+				if ( '' === $key ) {
+					\WP_CLI::warning( 'No redirect from "' . $path . '".' );
+					continue;
+				}
+				$keys[] = $key;
+			}
+
+			$removed = $this->redirects->remove( $keys );
+			foreach ( array_keys( $removed ) as $key ) {
+				\WP_CLI::success( 'Removed the redirect from ' . $key . '.' );
+			}
+			return;
+		}
+
+		if ( 'list' !== $action ) {
+			\WP_CLI::error( 'Use "list" or "remove".' );
+		}
+
+		$items = array();
+		$page  = 1;
+		do {
+			$found   = Redirects::find(
+				array(
+					'taxonomy'     => $assoc_args['taxonomy'] ?? '',
+					'per_page'     => 500,
+					'page'         => $page++,
+					'check_access' => false,
+				)
+			);
+			$items   = array_merge( $items, $found['items'] );
+			$fetched = count( $found['items'] );
+		} while ( 500 === $fetched );
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( 'ids' === $format ) {
+			\WP_CLI::line( implode( ' ', wp_list_pluck( $items, 'path' ) ) );
+			return;
+		}
+
+		$rows = array();
+		foreach ( $items as $row ) {
+			$rows[] = array(
+				'old'      => $row['path'],
+				'new'      => $row['new_url'],
+				'taxonomy' => $row['taxonomy'],
+				'kind'     => $row['kind'],
+				'hits'     => $row['hits'],
+				'created'  => gmdate( 'Y-m-d H:i:s', (int) $row['created'] ),
+			);
+		}
+
+		\WP_CLI\Utils\format_items( $format, $rows, array( 'old', 'new', 'taxonomy', 'kind', 'hits', 'created' ) );
 	}
 }
