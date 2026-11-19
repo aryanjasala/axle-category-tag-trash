@@ -39,11 +39,12 @@ Posts and pages go to the trash when you delete them. Categories and tags don't:
 - **Old term links keep working**: change a slug, move a term under another parent or merge it, and its old address sends a 301 to the new one. Feeds and numbered pages follow. A new term that takes the old slug wins
 - **Redirects tab** on the same screen: old address, new address, why, since when and how many hits, with Remove and Undo. Redirects follow the term, so renaming twice never makes a chain
 - **Redirect on delete**: pick a term on the edit screen under "If this term is deleted", and the deleted term's address goes there
+- **Deleted terms that still get visits**: the trash row says "Old address visited 42 times this week" (people only, known bots skipped, no write on every request), with "Redirect its old address..." to send it to a term or an address on the site, and Undo. Site Health flags addresses that keep getting visits
 - **Same ID** on restore, so navigation blocks, widgets and shortcodes that store the ID work again
 - **Everything comes back**: term meta, posts (in the same order), child terms and menu links in their menu position
 - Posts that only got **Uncategorized** because of the delete lose it again
 - **Tools > Axle Category & Tag Trash**: taxonomy tabs, search, bulk restore and delete, Empty trash, and what each restore brings back
-- Kept for **7, 30, 90 or 365 days**, then a daily task deletes them for good
+- Kept for **7, 30, 90 or 365 days** (a select at the top of the screen that saves when you change it), then a daily task deletes them for good
 - Big merges and restores run in batches in the background, with a progress bar
 - Each taxonomy's own capabilities decide who sees, restores, deletes or merges its terms
 - Categories, tags, WooCommerce product categories and attributes, and any custom taxonomy with an admin screen
@@ -71,6 +72,8 @@ wp axle-category-tag-trash list --taxonomy=category
 wp axle-category-tag-trash restore 42
 wp axle-category-tag-trash delete --all
 wp axle-category-tag-trash redirects list --taxonomy=category
+wp axle-category-tag-trash old-addresses --min=10
+wp axle-category-tag-trash redirect-old 42 --term=12
 ```
 
 ## Screenshots
@@ -78,10 +81,14 @@ wp axle-category-tag-trash redirects list --taxonomy=category
 <table>
   <tr>
     <td width="50%" valign="top"><img src=".wordpress-org/screenshot-1.png" alt="Undo right after deleting a category"><br><sub>Undo right after deleting a category</sub></td>
-    <td width="50%" valign="top"><img src=".wordpress-org/screenshot-2.png" alt="Tools > Axle Category & Tag Trash"><br><sub>Tools > Axle Category & Tag Trash</sub></td>
+    <td width="50%" valign="top"><img src=".wordpress-org/screenshot-2.png" alt="Tools > Category & Tag Trash, with a deleted category whose old address still gets visits"><br><sub>Tools > Category & Tag Trash, with a deleted category whose old address still gets visits</sub></td>
   </tr>
   <tr>
     <td width="50%" valign="top"><img src=".wordpress-org/screenshot-3.png" alt="What a restore brings back"><br><sub>What a restore brings back</sub></td>
+    <td width="50%" valign="top"><img src=".wordpress-org/screenshot-4.png" alt="Redirecting the old address of a deleted category"><br><sub>Redirecting the old address of a deleted category</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src=".wordpress-org/screenshot-5.png" alt="The Redirects tab"><br><sub>The Redirects tab</sub></td>
   </tr>
 </table>
 

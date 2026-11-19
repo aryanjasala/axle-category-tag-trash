@@ -107,6 +107,14 @@
 		}
 	} );
 
+	// The retention select saves when it changes. Without this script, a Save button shows instead.
+	var retention = document.getElementById( 'actt-retention' );
+	if ( retention && retention.form ) {
+		retention.addEventListener( 'change', function () {
+			retention.form.submit();
+		} );
+	}
+
 	// Bulk "Delete permanently" on the list.
 	var list = document.getElementById( 'actt-list-form' );
 	if ( list ) {

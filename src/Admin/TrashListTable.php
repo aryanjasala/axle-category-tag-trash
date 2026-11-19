@@ -8,6 +8,7 @@
 namespace AryanX\Axle\CategoryTagTrash\Admin;
 
 use AryanX\Axle\CategoryTagTrash\Access;
+use AryanX\Axle\CategoryTagTrash\OldAddresses;
 use AryanX\Axle\CategoryTagTrash\Snapshot;
 use AryanX\Axle\CategoryTagTrash\Trash;
 
@@ -30,6 +31,13 @@ final class TrashListTable extends \WP_List_Table {
 	private Trash $trash;
 
 	/**
+	 * Visits to old addresses, for the rows.
+	 *
+	 * @var OldAddresses|null
+	 */
+	private ?OldAddresses $old_addresses;
+
+	/**
 	 * Snapshots of the items on this page, keyed by trash item ID.
 	 *
 	 * @var array<int, Snapshot>
@@ -39,10 +47,12 @@ final class TrashListTable extends \WP_List_Table {
 	/**
 	 * Sets up the table.
 	 *
-	 * @param Trash $trash Trashed terms.
+	 * @param Trash             $trash         Trashed terms.
+	 * @param OldAddresses|null $old_addresses Visits to old addresses.
 	 */
-	public function __construct( Trash $trash ) {
-		$this->trash = $trash;
+	public function __construct( Trash $trash, ?OldAddresses $old_addresses = null ) {
+		$this->trash         = $trash;
+		$this->old_addresses = $old_addresses;
 
 		parent::__construct(
 			array(
@@ -218,9 +228,42 @@ final class TrashListTable extends \WP_List_Table {
 			);
 		}
 
+		$stats = $this->old_address( $snapshot, $item_id );
+
+		if ( $stats && '' === $stats['redirect'] && taxonomy_exists( $snapshot->taxonomy ) && Access::can( $snapshot->taxonomy, Access::REDIRECTS ) ) {
+			$actions['redirect'] = sprintf(
+				'<a href="%s" class="actt-redirect-old-link">%s</a>',
+				esc_url(
+					add_query_arg(
+						array(
+							'view' => 'redirect-old',
+							'item' => $item_id,
+						),
+						admin_url( 'tools.php?page=' . TrashPage::SLUG ) 
+					) 
+				),
+				esc_html__( 'Redirect its old address...', 'axle-category-tag-trash' )
+			);
+		}
+
 		$note = '';
+		if ( $stats && $stats['week'] ) {
+			$note .= sprintf(
+				'<br><span class="axle-badge axle-badge--warning actt-visits">%s</span>',
+				esc_html(
+					sprintf(
+						/* translators: %s: number of visits. */
+						_n( 'Old address visited %s time this week', 'Old address visited %s times this week', $stats['week'], 'axle-category-tag-trash' ),
+						number_format_i18n( $stats['week'] )
+					)
+				)
+			);
+		}
+		if ( $stats && '' !== $stats['redirect'] ) {
+			$note .= sprintf( '<br><span class="axle-muted">%s</span>', esc_html__( 'Its old address redirects.', 'axle-category-tag-trash' ) );
+		}
 		if ( $merge ) {
-			$note = sprintf(
+			$note .= sprintf(
 				'<br><span class="axle-badge axle-badge--info">%s</span>',
 				/* translators: %s: name of the term this one was merged into. */
 				esc_html( sprintf( __( 'Merged into %s', 'axle-category-tag-trash' ), $merge['target_name'] ) )
@@ -235,6 +278,21 @@ final class TrashListTable extends \WP_List_Table {
 			$this->row_actions( $actions ),
 			$this->details( $snapshot, $merge )
 		);
+	}
+
+	/**
+	 * Visits to the old address of a trashed term, for people who may change redirects of its taxonomy.
+	 *
+	 * @param Snapshot $snapshot Trashed term.
+	 * @param int      $item_id  Trash item ID.
+	 * @return array{path: string, week: int, total: int, last: int, redirect: string}|null
+	 */
+	private function old_address( Snapshot $snapshot, int $item_id ): ?array {
+		if ( ! $this->old_addresses instanceof OldAddresses || ! Access::can( $snapshot->taxonomy, Access::REDIRECTS ) ) {
+			return null;
+		}
+
+		return OldAddresses::stats( $item_id, $snapshot );
 	}
 
 	/**

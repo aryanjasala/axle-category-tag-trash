@@ -86,3 +86,39 @@
 .actt-row-confirm {
 	max-width: 36em;
 }
+
+/* Retention: a label and a select in the intro, saved on change. */
+.actt-retention {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 16px;
+}
+
+.actt-retention .description {
+	margin: 0;
+}
+
+.actt-redirect-old__choice {
+	border: 0;
+	margin: 0 0 12px;
+	min-width: 0;
+	padding: 0;
+}
+
+.actt-redirect-old__choice legend {
+	font-weight: 600;
+	margin-bottom: 8px;
+	padding: 0;
+}
+
+.actt-redirect-old select,
+.actt-redirect-old input[type="text"] {
+	box-sizing: border-box;
+	max-width: 100%;
+}
+
+.actt-redirect-old input[type="text"] {
+	width: min(25em, 100%);
+}

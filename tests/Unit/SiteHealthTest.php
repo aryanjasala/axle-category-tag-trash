@@ -9,16 +9,25 @@ namespace AryanX\Axle\CategoryTagTrash\Tests\Unit;
 
 use AryanX\Axle\CategoryTagTrash\Health\SiteHealth;
 use AryanX\Axle\CategoryTagTrash\Merger;
+use AryanX\Axle\CategoryTagTrash\OldAddresses;
+use AryanX\Axle\CategoryTagTrash\Redirects;
 use AryanX\Axle\CategoryTagTrash\Settings;
 use AryanX\Axle\CategoryTagTrash\Trash;
 use Brain\Monkey\Functions;
 
 final class SiteHealthTest extends TestCase {
 
+	protected function setUp(): void {
+		parent::setUp();
+		// No persistent object cache, and nothing waiting to be written.
+		Functions\when( 'wp_using_ext_object_cache' )->justReturn( false );
+		Functions\when( 'wp_cache_get' )->justReturn( false );
+	}
+
 	private function health(): SiteHealth {
 		$trash = new Trash( new Settings() );
 
-		return new SiteHealth( $trash, new Merger( $trash ) );
+		return new SiteHealth( $trash, new Merger( $trash ), new OldAddresses( $trash, new Redirects() ) );
 	}
 
 	/**
@@ -72,5 +81,29 @@ final class SiteHealthTest extends TestCase {
 		$this->options['axle_category_tag_trash_lock_32'] = time();
 
 		$this->assertSame( 'good', $this->health()->run()['status'] );
+	}
+
+	public function test_old_addresses_that_keep_getting_visits_are_recommended_a_redirect(): void {
+		Functions\when( 'get_current_user_id' )->justReturn( 5 );
+		Functions\when( 'current_user_can' )->justReturn( true );
+		Functions\when( 'sanitize_key' )->returnArg();
+		Functions\when( 'get_taxonomy' )->justReturn( (object) array( 'cap' => (object) array( 'manage_terms' => 'm', 'edit_terms' => 'e', 'delete_terms' => 'd' ) ) );
+		Functions\when( 'get_post_type' )->justReturn( Trash::POST_TYPE );
+		Functions\when( 'get_post_meta' )->justReturn( array( 'term_id' => 9, 'taxonomy' => 'category', 'name' => 'Recipes', 'path' => 'category/recipes' ) );
+		Functions\when( 'admin_url' )->returnArg();
+		Functions\when( 'number_format_i18n' )->returnArg();
+
+		$this->assertSame( 'good', $this->health()->run_old_visits()['status'] );
+
+		$this->options['axle_category_tag_trash_old_paths'] = array( 'category/recipes' => 31 );
+		$this->options['axle_category_tag_trash_old_hits']  = array(
+			'category/recipes' => array( 'n' => 4, 'last' => time(), 'd' => array( gmdate( 'Ymd' ) => 4 ) ),
+		);
+		$this->assertSame( 'good', $this->health()->run_old_visits()['status'], 'under the threshold' );
+
+		$this->options['axle_category_tag_trash_old_hits']['category/recipes'] = array( 'n' => 40, 'last' => time(), 'd' => array( gmdate( 'Ymd' ) => 40 ) );
+		$result = $this->health()->run_old_visits();
+		$this->assertSame( 'recommended', $result['status'] );
+		$this->assertStringNotContainsString( 'Recipes', $result['description'], 'no term names in the test' );
 	}
 }

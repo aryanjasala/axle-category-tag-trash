@@ -49,6 +49,11 @@ final class Redirects implements Service {
 	public const KIND_TRASH  = 'trash';
 
 	/**
+	 * A redirect added by hand for the old address of a trashed term.
+	 */
+	public const KIND_MANUAL = 'manual';
+
+	/**
 	 * Paths of a term and its descendants before an update, keyed by term ID.
 	 *
 	 * @var array<int, array{paths: array<int, string>, slug: string, parent: int}>
@@ -379,7 +384,7 @@ final class Redirects implements Service {
 				continue;
 			}
 
-			if ( $entry['old_term'] === $old_id && in_array( $entry['kind'], array( self::KIND_MERGE, self::KIND_TRASH ), true ) ) {
+			if ( $entry['old_term'] === $old_id && in_array( $entry['kind'], array( self::KIND_MERGE, self::KIND_TRASH, self::KIND_MANUAL ), true ) ) {
 				unset( $map[ $key ] );
 				$dirty = true;
 				continue;
@@ -459,16 +464,51 @@ final class Redirects implements Service {
 	}
 
 	/**
+	 * Records that an old address leads to a fixed address on this site.
+	 *
+	 * @param string $old_path Old path.
+	 * @param string $taxonomy Taxonomy of the term that lived at the old address.
+	 * @param string $url      Full address on this site.
+	 * @param string $kind     One of the KIND_ constants.
+	 * @param int    $old_term ID of the term that lived at the old address.
+	 * @return bool Whether a redirect is now stored.
+	 */
+	public function record_url( string $old_path, string $taxonomy, string $url, string $kind, int $old_term = 0 ): bool {
+		$old_path = self::normalize( $old_path );
+
+		if ( '' === $old_path || '' === $taxonomy || '' === $url || ! self::enabled() || ! self::supports( $taxonomy ) ) {
+			return false;
+		}
+
+		$map              = self::all();
+		$map[ $old_path ] = array(
+			'taxonomy' => $taxonomy,
+			'term'     => 0,
+			'url'      => $url,
+			'old_term' => $old_term,
+			'kind'     => $kind,
+			'created'  => time(),
+			'chain'    => array(),
+		);
+		$this->save( $this->trim( $map ) );
+
+		/** This action is documented in src/Redirects.php */
+		do_action( 'axle_category_tag_trash_redirect_added', $old_path, $map[ $old_path ] );
+
+		return true;
+	}
+
+	/**
 	 * Every redirect, cleaned, keyed by old path.
 	 *
-	 * @return array<string, array{taxonomy: string, term: int, old_term: int, kind: string, created: int, chain: array<int, array{from: int, by: int}>}>
+	 * @return array<string, array{taxonomy: string, term: int, url: string, old_term: int, kind: string, created: int, chain: array<int, array{from: int, by: int}>}>
 	 */
 	public static function all(): array {
 		$saved = get_option( self::OPTION, array() );
 		$map   = array();
 
 		foreach ( is_array( $saved ) ? $saved : array() as $key => $entry ) {
-			if ( ! is_array( $entry ) || empty( $entry['taxonomy'] ) || empty( $entry['term'] ) || '' === (string) $key ) {
+			if ( ! is_array( $entry ) || empty( $entry['taxonomy'] ) || ( empty( $entry['term'] ) && empty( $entry['url'] ) ) || '' === (string) $key ) {
 				continue;
 			}
 
@@ -484,7 +524,8 @@ final class Redirects implements Service {
 
 			$map[ (string) $key ] = array(
 				'taxonomy' => (string) $entry['taxonomy'],
-				'term'     => (int) $entry['term'],
+				'term'     => (int) ( $entry['term'] ?? 0 ),
+				'url'      => (string) ( $entry['url'] ?? '' ),
 				'old_term' => (int) ( $entry['old_term'] ?? 0 ),
 				'kind'     => (string) ( $entry['kind'] ?? self::KIND_RENAME ),
 				'created'  => (int) ( $entry['created'] ?? 0 ),
@@ -595,8 +636,12 @@ final class Redirects implements Service {
 	 * @return string Empty when the target term is gone.
 	 */
 	public static function target_url( string $key, array $entry, string $tail = '' ): string {
-		$term = get_term( (int) $entry['term'], (string) $entry['taxonomy'] );
-		$url  = $term instanceof \WP_Term ? get_term_link( $term ) : '';
+		if ( ! empty( $entry['url'] ) ) {
+			$url = (string) $entry['url'];
+		} else {
+			$term = get_term( (int) $entry['term'], (string) $entry['taxonomy'] );
+			$url  = $term instanceof \WP_Term ? get_term_link( $term ) : '';
+		}
 
 		if ( ! is_string( $url ) || '' === $url ) {
 			return '';
@@ -706,21 +751,12 @@ final class Redirects implements Service {
 	}
 
 	/**
-	 * Counts one visit to an old address.
+	 * Counts one visit to an old address, without a database write on every request. See HitCounter.
 	 *
 	 * @param string $key Old path.
 	 */
 	private function count_hit( string $key ): void {
-		$hits         = self::hits();
-		$row          = $hits[ $key ] ?? array(
-			'n'    => 0,
-			'last' => 0,
-		);
-		$hits[ $key ] = array(
-			'n'    => $row['n'] + 1,
-			'last' => time(),
-		);
-		update_option( self::HITS_OPTION, $hits, false );
+		HitCounter::record( HitCounter::REDIRECT, $key );
 	}
 
 	/**
@@ -741,8 +777,9 @@ final class Redirects implements Service {
 		$taxonomy = Access::taxonomy_name( $args['taxonomy'] ?? '' );
 		$search   = strtolower( trim( (string) ( $args['search'] ?? '' ) ) );
 		$check    = ! isset( $args['check_access'] ) || $args['check_access'];
-		$hits     = self::hits();
-		$rows     = array();
+		HitCounter::flush();
+		$hits = self::hits();
+		$rows = array();
 
 		foreach ( self::all() as $key => $entry ) {
 			if ( ( '' !== $taxonomy && $entry['taxonomy'] !== $taxonomy ) || ( $check && ! Access::can( $entry['taxonomy'], Access::LIST ) ) ) {

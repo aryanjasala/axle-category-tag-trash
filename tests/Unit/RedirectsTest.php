@@ -9,7 +9,9 @@ namespace AryanX\Axle\CategoryTagTrash\Tests\Unit;
 
 use AryanX\Axle\CategoryTagTrash\Abilities;
 use AryanX\Axle\CategoryTagTrash\Access;
+use AryanX\Axle\CategoryTagTrash\HitCounter;
 use AryanX\Axle\CategoryTagTrash\Merger;
+use AryanX\Axle\CategoryTagTrash\OldAddresses;
 use AryanX\Axle\CategoryTagTrash\Redirects;
 use AryanX\Axle\CategoryTagTrash\Restorer;
 use AryanX\Axle\CategoryTagTrash\Settings;
@@ -44,6 +46,9 @@ final class RedirectsTest extends TestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+		// No persistent object cache, and nothing waiting to be written.
+		Functions\when( 'wp_using_ext_object_cache' )->justReturn( false );
+		Functions\when( 'wp_cache_get' )->justReturn( false );
 
 		$this->caps       = array( 'manage_categories' );
 		$this->transients = array();
@@ -487,7 +492,7 @@ final class RedirectsTest extends TestCase {
 			),
 		);
 		$trash     = new Trash( new Settings() );
-		$abilities = new Abilities( $trash, new Restorer( $trash ), new Merger( $trash ), $this->redirects() );
+		$abilities = new Abilities( $trash, new Restorer( $trash ), new Merger( $trash ), $this->redirects(), new OldAddresses( $trash, $this->redirects() ) );
 
 		$this->assertFalse( $abilities->can_remove_redirect( array( 'path' => 'topics/brand-old' ) ) );
 		$this->assertTrue( $abilities->can_remove_redirect( array( 'path' => 'topics/not-there' ) ), 'a missing redirect is reported by the ability' );
@@ -508,5 +513,293 @@ final class RedirectsTest extends TestCase {
 	public function test_access_for_redirects_needs_manage_and_edit_terms(): void {
 		$this->assertTrue( Access::can( 'category', Access::REDIRECTS ) );
 		$this->assertFalse( Access::can( 'product_brand', Access::REDIRECTS ) );
+	}
+
+	/**
+	 * Puts a trashed term with an old address in the stubbed trash.
+	 *
+	 * @param int    $item_id  Trash item ID.
+	 * @param string $path     Old address.
+	 * @param string $taxonomy Taxonomy.
+	 */
+	private function trashed( int $item_id, string $path, string $taxonomy = 'category' ): void {
+		$snapshot           = new Snapshot();
+		$snapshot->term_id  = 90 + $item_id;
+		$snapshot->taxonomy = $taxonomy;
+		$snapshot->name     = 'Recipes';
+		$snapshot->slug     = 'recipes';
+		$snapshot->path     = $path;
+
+		Functions\when( 'get_post_type' )->justReturn( Trash::POST_TYPE );
+		Functions\when( 'get_post_meta' )->justReturn( $snapshot->to_array() );
+		Functions\when( 'esc_url_raw' )->returnArg();
+	}
+
+	private function old_addresses(): OldAddresses {
+		return new OldAddresses( new Trash( new Settings() ), $this->redirects() );
+	}
+
+	public function test_bots_and_scripts_are_not_counted(): void {
+		$this->assertTrue( OldAddresses::is_bot( 'Mozilla/5.0 (compatible; Googlebot/2.1)' ) );
+		$this->assertTrue( OldAddresses::is_bot( 'curl/8.4.0' ) );
+		$this->assertTrue( OldAddresses::is_bot( '' ), 'no user agent' );
+		$this->assertFalse( OldAddresses::is_bot( 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15' ) );
+
+		Filters\expectApplied( 'axle_category_tag_trash_bot_agents' )->once()->andReturn( array( 'safari' ) );
+		$this->assertTrue( OldAddresses::is_bot( 'Mozilla/5.0 Safari/605' ), 'the list is filterable' );
+	}
+
+	public function test_a_request_matches_a_trashed_address_with_its_feed_or_page(): void {
+		$map = array( 'topics/recipes' => 31 );
+
+		$this->assertSame( 'topics/recipes', OldAddresses::key_for( 'topics/recipes', $map ) );
+		$this->assertSame( 'topics/recipes', OldAddresses::key_for( 'topics/recipes/feed', $map ) );
+		$this->assertSame( 'topics/recipes', OldAddresses::key_for( 'topics/recipes/page/3', $map ) );
+		$this->assertNull( OldAddresses::key_for( 'topics/recipes-two', $map ) );
+		$this->assertNull( OldAddresses::key_for( 'topics/other', $map ) );
+	}
+
+	public function test_a_trashed_address_is_kept_on_trash_and_dropped_with_its_counts_on_delete_or_restore(): void {
+		$old      = $this->old_addresses();
+		$snapshot = new Snapshot();
+		$snapshot->path = 'topics/recipes';
+
+		$old->add( 31, $snapshot );
+		$this->assertSame( array( 'topics/recipes' => 31 ), OldAddresses::map() );
+
+		$empty = new Snapshot();
+		$old->add( 32, $empty );
+		$this->assertCount( 1, OldAddresses::map(), 'a term with no known address is not watched' );
+
+		$this->options[ OldAddresses::HITS_OPTION ] = array( 'topics/recipes' => array( 'n' => 3, 'last' => 9, 'd' => array() ) );
+		$old->forget_item( 99, $snapshot );
+		$this->assertCount( 1, OldAddresses::map(), 'another item with the same address does not remove it' );
+
+		$old->forget_restored( 91, 'category', $snapshot );
+		$this->assertSame( array(), OldAddresses::map() );
+		$this->assertSame( array(), $this->options[ OldAddresses::HITS_OPTION ] );
+	}
+
+	public function test_a_bot_visit_to_a_trashed_address_writes_nothing(): void {
+		$this->options[ OldAddresses::MAP_OPTION ] = array( 'topics/recipes' => 31 );
+		Functions\when( 'is_404' )->justReturn( true );
+		Functions\when( 'is_admin' )->justReturn( false );
+		$GLOBALS['wp']          = (object) array( 'request' => 'topics/recipes/' );
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+		$_SERVER['HTTP_USER_AGENT'] = 'Googlebot/2.1';
+
+		$this->old_addresses()->count_visit();
+
+		$this->assertArrayNotHasKey( OldAddresses::HITS_OPTION, $this->options );
+	}
+
+	public function test_a_person_is_counted_once_a_minute_without_an_object_cache(): void {
+		$this->options[ OldAddresses::MAP_OPTION ] = array( 'topics/recipes' => 31 );
+		Functions\when( 'is_404' )->justReturn( true );
+		Functions\when( 'is_admin' )->justReturn( false );
+		$GLOBALS['wp']          = (object) array( 'request' => 'topics/recipes/' );
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+		$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 Safari/605';
+
+		Actions\expectDone( 'axle_category_tag_trash_old_address_visited' )->twice();
+		$old = $this->old_addresses();
+		$old->count_visit();
+		$old->count_visit();
+
+		$row = $this->options[ OldAddresses::HITS_OPTION ]['topics/recipes'];
+		$this->assertSame( 1, $row['n'], 'the second visit in the same minute does not write' );
+		$this->assertSame( 1, array_sum( $row['d'] ) );
+	}
+
+	public function test_with_an_object_cache_visits_wait_in_the_cache_until_the_hourly_write(): void {
+		$cache = array();
+		Functions\when( 'wp_using_ext_object_cache' )->justReturn( true );
+		Functions\when( 'wp_cache_add' )->alias(
+			function ( $key, $value ) use ( &$cache ) {
+				if ( isset( $cache[ $key ] ) ) {
+					return false;
+				}
+				$cache[ $key ] = $value;
+				return true;
+			}
+		);
+		Functions\when( 'wp_cache_incr' )->alias(
+			function ( $key, $by ) use ( &$cache ) {
+				$cache[ $key ] = ( $cache[ $key ] ?? 0 ) + $by;
+				return $cache[ $key ];
+			}
+		);
+		Functions\when( 'wp_cache_decr' )->alias(
+			function ( $key, $by ) use ( &$cache ) {
+				$cache[ $key ] -= $by;
+				return $cache[ $key ];
+			}
+		);
+		Functions\when( 'wp_cache_set' )->alias(
+			function ( $key, $value ) use ( &$cache ) {
+				$cache[ $key ] = $value;
+				return true;
+			}
+		);
+		Functions\when( 'wp_cache_get' )->alias(
+			function ( $key ) use ( &$cache ) {
+				return $cache[ $key ] ?? false;
+			}
+		);
+		Functions\when( 'wp_cache_delete' )->alias(
+			function ( $key ) use ( &$cache ) {
+				unset( $cache[ $key ] );
+				return true;
+			}
+		);
+		Functions\when( 'wp_next_scheduled' )->justReturn( false );
+		Functions\expect( 'wp_schedule_single_event' )->once();
+		Functions\when( 'get_post_type' )->justReturn( Trash::POST_TYPE );
+
+		$this->options[ OldAddresses::MAP_OPTION ] = array( 'topics/recipes' => 31 );
+		$this->options[ Redirects::OPTION ]        = array(
+			'topics/seo' => array(
+				'taxonomy' => 'category',
+				'term'     => 1,
+				'kind'     => Redirects::KIND_RENAME,
+				'created'  => 100,
+			),
+		);
+
+		for ( $i = 0; $i < 25; $i++ ) {
+			HitCounter::record( HitCounter::OLD, 'topics/recipes' );
+		}
+		HitCounter::record( HitCounter::REDIRECT, 'topics/seo' );
+		HitCounter::record( HitCounter::REDIRECT, 'topics/seo' );
+
+		$this->assertArrayNotHasKey( OldAddresses::HITS_OPTION, $this->options, 'no database write for a visit' );
+		$this->assertArrayNotHasKey( Redirects::HITS_OPTION, $this->options );
+
+		HitCounter::flush();
+
+		$this->assertSame( 25, $this->options[ OldAddresses::HITS_OPTION ]['topics/recipes']['n'] );
+		$this->assertSame( 2, Redirects::hits()['topics/seo']['n'] );
+
+		HitCounter::flush();
+		$this->assertSame( 25, $this->options[ OldAddresses::HITS_OPTION ]['topics/recipes']['n'], 'a second write adds nothing' );
+	}
+
+	public function test_visits_this_week_do_not_count_older_days(): void {
+		$old = gmdate( 'Ymd', time() - 10 * DAY_IN_SECONDS );
+		$new = gmdate( 'Ymd', time() - DAY_IN_SECONDS );
+
+		$this->assertSame(
+			4,
+			OldAddresses::week_visits(
+				array(
+					'n'    => 14,
+					'last' => time(),
+					'd'    => array(
+						$new => 4,
+						$old => 10,
+					),
+				)
+			)
+		);
+	}
+
+	public function test_an_old_address_can_be_redirected_to_a_term_after_the_delete(): void {
+		$this->trashed( 31, 'topics/recipes' );
+
+		Actions\expectDone( 'axle_category_tag_trash_redirect_added' )->once();
+		$result = $this->old_addresses()->redirect( 31, array( 'term' => 1 ) );
+
+		$this->assertSame( 'topics/recipes', $result['path'] );
+		$this->assertSame( 'https://example.test/topics/search/', $result['new_url'] );
+		$entry = Redirects::all()['topics/recipes'];
+		$this->assertSame( Redirects::KIND_MANUAL, $entry['kind'] );
+		$this->assertSame( 121, $entry['old_term'] );
+
+		$again = $this->old_addresses()->redirect( 31, array( 'term' => 2 ) );
+		$this->assertSame( 'axle_category_tag_trash_exists', $again->get_error_code() );
+	}
+
+	public function test_an_old_address_can_be_redirected_to_an_address_on_this_site_only(): void {
+		$this->trashed( 31, 'topics/recipes' );
+		$old = $this->old_addresses();
+
+		$bad = $old->redirect( 31, array( 'url' => 'https://elsewhere.test/page/' ) );
+		$this->assertSame( 'axle_category_tag_trash_bad_target', $bad->get_error_code() );
+		$this->assertSame( array(), Redirects::all() );
+
+		$loop = $old->redirect( 31, array( 'url' => '/topics/recipes/' ) );
+		$this->assertSame( 'axle_category_tag_trash_bad_target', $loop->get_error_code(), 'it cannot redirect to itself' );
+
+		$result = $old->redirect( 31, array( 'url' => '/blog/' ) );
+		$this->assertSame( 'https://example.test/blog/', $result['new_url'] );
+		$entry = Redirects::all()['topics/recipes'];
+		$this->assertSame( 0, $entry['term'] );
+		$this->assertSame( 'https://example.test/blog/page/2/', Redirects::target_url( 'topics/recipes', $entry, '/page/2' ), 'numbered pages follow' );
+	}
+
+	public function test_redirecting_an_old_address_needs_rights_for_its_taxonomy(): void {
+		$this->trashed( 31, 'topics/brand-old', 'product_brand' );
+		$old = $this->old_addresses();
+
+		$result = $old->redirect( 31, array( 'term' => 3 ) );
+		$this->assertSame( 'axle_category_tag_trash_forbidden', $result->get_error_code() );
+		$this->assertSame( array(), Redirects::all() );
+
+		$trash     = new Trash( new Settings() );
+		$abilities = new Abilities( $trash, new Restorer( $trash ), new Merger( $trash ), $this->redirects(), $old );
+		$this->assertFalse( $abilities->can_redirect_old_address( array( 'id' => 31 ) ) );
+
+		$this->assertSame( array(), $old->visited( 1 ), 'no counts for a taxonomy the user may not change' );
+
+		$this->caps = array( 'manage_categories', 'manage_brands' );
+		$this->assertTrue( $abilities->can_redirect_old_address( array( 'id' => 31 ) ) );
+		$this->assertIsArray( $old->redirect( 31, array( 'term' => 3 ) ) );
+	}
+
+	public function test_a_term_with_no_known_address_cannot_be_redirected(): void {
+		$this->trashed( 31, '' );
+
+		$result = $this->old_addresses()->redirect( 31, array( 'term' => 1 ) );
+		$this->assertSame( 'axle_category_tag_trash_no_address', $result->get_error_code() );
+	}
+
+	public function test_visited_lists_only_addresses_with_visits_that_do_not_redirect(): void {
+		$this->trashed( 31, 'topics/recipes' );
+		$this->options[ OldAddresses::MAP_OPTION ]  = array(
+			'topics/recipes' => 31,
+			'topics/quiet'   => 32,
+			'topics/done'    => 33,
+		);
+		$day                                         = gmdate( 'Ymd' );
+		$this->options[ OldAddresses::HITS_OPTION ] = array(
+			'topics/recipes' => array( 'n' => 42, 'last' => time(), 'd' => array( $day => 42 ) ),
+			'topics/done'    => array( 'n' => 90, 'last' => time(), 'd' => array( $day => 90 ) ),
+		);
+		$this->options[ Redirects::OPTION ]          = array(
+			'topics/done' => array(
+				'taxonomy' => 'category',
+				'term'     => 1,
+				'kind'     => Redirects::KIND_MANUAL,
+				'created'  => 100,
+			),
+		);
+
+		$rows = $this->old_addresses()->visited( 10 );
+
+		$this->assertCount( 1, $rows );
+		$this->assertSame( 'topics/recipes', $rows[0]['path'] );
+		$this->assertSame( 42, $rows[0]['week'] );
+	}
+
+	public function test_a_restored_term_takes_its_added_redirect_away(): void {
+		$this->trashed( 31, 'topics/recipes' );
+		$this->old_addresses()->redirect( 31, array( 'term' => 1 ) );
+		$this->assertArrayHasKey( 'topics/recipes', Redirects::all() );
+
+		$snapshot          = new Snapshot();
+		$snapshot->term_id = 121;
+		$this->redirects()->after_restore( 121, 'category', $snapshot );
+
+		$this->assertArrayNotHasKey( 'topics/recipes', Redirects::all() );
 	}
 }

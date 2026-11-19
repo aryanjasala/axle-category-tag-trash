@@ -15,6 +15,9 @@ function axle_category_tag_trash_uninstall_site(): void {
 
 	wp_clear_scheduled_hook( 'axle_category_tag_trash_purge' );
 	wp_clear_scheduled_hook( 'axle_category_tag_trash_empty' );
+	wp_clear_scheduled_hook( 'axle_category_tag_trash_flush_hits' );
+	delete_option( 'axle_category_tag_trash_old_paths' );
+	delete_option( 'axle_category_tag_trash_old_hits' );
 	delete_option( 'axle_category_tag_trash_settings' );
 	delete_option( 'axle_category_tag_trash_redirects' );
 	delete_option( 'axle_category_tag_trash_redirect_hits' );

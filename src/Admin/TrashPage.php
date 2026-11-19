@@ -9,6 +9,7 @@ namespace AryanX\Axle\CategoryTagTrash\Admin;
 
 use AryanX\Axle\CategoryTagTrash\Access;
 use AryanX\Axle\CategoryTagTrash\Merger;
+use AryanX\Axle\CategoryTagTrash\OldAddresses;
 use AryanX\Axle\CategoryTagTrash\Purger;
 use AryanX\Axle\CategoryTagTrash\Redirects;
 use AryanX\Axle\CategoryTagTrash\Restorer;
@@ -64,15 +65,32 @@ final class TrashPage implements Service {
 	private RedirectsTab $redirects_tab;
 
 	/**
+	 * Visits to the old addresses of trashed terms.
+	 *
+	 * @var OldAddresses
+	 */
+	private OldAddresses $old_addresses;
+
+	/**
+	 * Old term addresses that redirect.
+	 *
+	 * @var Redirects
+	 */
+	private Redirects $redirects;
+
+	/**
 	 * Sets up the screen.
 	 *
-	 * @param Trash     $trash     Trashed terms.
-	 * @param Restorer  $restorer  Restore logic.
-	 * @param Purger    $purger    Purging and emptying.
-	 * @param Merger    $merger    Merging terms.
-	 * @param Redirects $redirects Old term addresses that redirect.
+	 * @param Trash        $trash     Trashed terms.
+	 * @param Restorer     $restorer  Restore logic.
+	 * @param Purger       $purger    Purging and emptying.
+	 * @param Merger       $merger    Merging terms.
+	 * @param Redirects    $redirects     Old term addresses that redirect.
+	 * @param OldAddresses $old_addresses Visits to the old addresses of trashed terms.
 	 */
-	public function __construct( Trash $trash, Restorer $restorer, Purger $purger, Merger $merger, Redirects $redirects ) {
+	public function __construct( Trash $trash, Restorer $restorer, Purger $purger, Merger $merger, Redirects $redirects, OldAddresses $old_addresses ) {
+		$this->old_addresses = $old_addresses;
+		$this->redirects     = $redirects;
 		$this->redirects_tab = new RedirectsTab( $redirects );
 		$this->trash         = $trash;
 		$this->restorer      = $restorer;
@@ -179,8 +197,8 @@ final class TrashPage implements Service {
 	 */
 	public function add_page(): void {
 		$hook = add_management_page(
-			__( 'Axle Category & Tag Trash', 'axle-category-tag-trash' ),
-			__( 'Axle Category & Tag Trash', 'axle-category-tag-trash' ),
+			__( 'Category & Tag Trash', 'axle-category-tag-trash' ),
+			__( 'Category & Tag Trash', 'axle-category-tag-trash' ),
 			self::capability(),
 			self::SLUG,
 			array( $this, 'render' )
@@ -263,12 +281,14 @@ final class TrashPage implements Service {
 			<hr class="wp-header-end">
 
 			<?php
-			if ( 'merge' !== $view ) {
+			if ( ! in_array( $view, array( 'merge', 'redirect-old' ), true ) ) {
 				$this->render_tabs( 'redirects' === $view ? 'redirects' : 'trash' );
 			}
 
 			if ( 'merge' === $view ) {
 				$this->render_merge();
+			} elseif ( 'redirect-old' === $view ) {
+				$this->render_redirect_old();
 			} elseif ( 'redirects' === $view ) {
 				$this->redirects_tab->render();
 			} else {
@@ -311,7 +331,7 @@ final class TrashPage implements Service {
 	private function render_trash(): void {
 		require_once ABSPATH . 'wp-admin/includes/class-wp-list-table.php';
 
-		$table = new TrashListTable( $this->trash );
+		$table = new TrashListTable( $this->trash, $this->old_addresses );
 		$table->prepare_items();
 		$days      = $this->trash->settings()->retention_days();
 		$total     = array_sum( $this->trash->count_by_taxonomy( Access::LIST ) );
@@ -320,17 +340,7 @@ final class TrashPage implements Service {
 		$this->render_notices();
 		$this->render_running_merges();
 		?>
-		<p class="axle-intro actt-intro">
-			<?php
-			echo esc_html(
-				sprintf(
-					/* translators: %d: number of days. */
-					_n( 'Deleted categories, tags and other terms are kept here for %d day, then deleted for good.', 'Deleted categories, tags and other terms are kept here for %d days, then deleted for good.', $days, 'axle-category-tag-trash' ),
-					$days
-				)
-			);
-			?>
-		</p>
+		<?php $this->render_intro( $days ); ?>
 
 		<?php if ( $total || $table->has_items() ) : ?>
 			<form method="get" id="actt-list-form" data-confirm-id="actt-bulk-confirm">
@@ -367,7 +377,6 @@ final class TrashPage implements Service {
 		<?php endif; ?>
 
 		<?php
-		$this->render_retention_form( $days );
 		$this->render_empty_card( $deletable );
 	}
 
@@ -761,43 +770,208 @@ final class TrashPage implements Service {
 	}
 
 	/**
-	 * Prints the "Keep deleted terms for" setting.
+	 * Prints the intro, with the retention setting as a select that saves when it changes.
 	 *
 	 * @param int $days Current retention in days.
 	 */
-	private function render_retention_form( int $days ): void {
+	private function render_intro( int $days ): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
+			?>
+			<p class="axle-intro actt-intro">
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: %d: number of days. */
+						_n( 'Deleted categories, tags and other terms are kept here for %d day, then deleted for good.', 'Deleted categories, tags and other terms are kept here for %d days, then deleted for good.', $days, 'axle-category-tag-trash' ),
+						$days
+					)
+				);
+				?>
+			</p>
+			<?php
 			return;
 		}
 		?>
-		<section class="axle-card">
-			<h2 class="axle-card__title"><?php esc_html_e( 'Retention', 'axle-category-tag-trash' ); ?></h2>
+		<p class="axle-intro actt-intro"><?php esc_html_e( 'Deleted categories, tags and other terms are kept here, then deleted for good.', 'axle-category-tag-trash' ); ?></p>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="actt-retention" id="actt-retention-form">
+			<?php wp_nonce_field( self::ACTION . '_settings' ); ?>
+			<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION ); ?>">
+			<input type="hidden" name="task" value="settings">
+			<label for="actt-retention"><?php esc_html_e( 'Keep deleted terms for', 'axle-category-tag-trash' ); ?></label>
+			<select id="actt-retention" name="retention_days" aria-describedby="actt-retention-note">
+				<?php foreach ( Settings::retention_choices() as $option ) : ?>
+					<option value="<?php echo esc_attr( (string) $option ); ?>" <?php selected( $days, $option ); ?>>
+						<?php
+						/* translators: %d: number of days. */
+						echo esc_html( sprintf( _n( '%d day', '%d days', $option, 'axle-category-tag-trash' ), $option ) );
+						?>
+					</option>
+				<?php endforeach; ?>
+			</select>
+			<span class="description" id="actt-retention-note"><?php esc_html_e( 'Saves when you change it.', 'axle-category-tag-trash' ); ?></span>
+			<noscript><button type="submit" class="button"><?php esc_html_e( 'Save', 'axle-category-tag-trash' ); ?></button></noscript>
+		</form>
+		<?php
+	}
+
+	/**
+	 * Prints the screen that redirects the old address of one trashed term.
+	 */
+	private function render_redirect_old(): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only; the form below has its own nonce.
+		$item_id  = isset( $_GET['item'] ) ? absint( $_GET['item'] ) : 0;
+		$snapshot = $item_id ? $this->trash->get( $item_id ) : null;
+		$back     = admin_url( 'tools.php?page=' . self::SLUG );
+
+		$this->render_notices();
+
+		// The same answer for a missing item and for a taxonomy this user may not change, so nothing about the term leaks.
+		if ( ! $snapshot || ! Access::can( $snapshot->taxonomy, Access::REDIRECTS ) || '' === $snapshot->path ) {
+			?>
+			<div class="axle-empty">
+				<p><strong><?php esc_html_e( 'This old address cannot be redirected.', 'axle-category-tag-trash' ); ?></strong></p>
+				<p><?php esc_html_e( 'The term may be gone from the trash, its address may not be known, or you may not be allowed to add redirects for it.', 'axle-category-tag-trash' ); ?></p>
+				<p><a class="button" href="<?php echo esc_url( $back ); ?>"><?php esc_html_e( 'Back to the trash', 'axle-category-tag-trash' ); ?></a></p>
+			</div>
+			<?php
+			return;
+		}
+
+		$stats = OldAddresses::stats( $item_id, $snapshot );
+
+		/** This filter is documented in src/Admin/RedirectsTab.php */
+		$limit = max( 1, (int) apply_filters( 'axle_category_tag_trash_redirect_choices_limit', 200, $snapshot->taxonomy ) );
+		?>
+		<section class="axle-card actt-redirect-old">
+			<h2 class="axle-card__title">
+				<?php
+				/* translators: %s: term name. */
+				echo esc_html( sprintf( __( 'Redirect the old address of "%s"', 'axle-category-tag-trash' ), $snapshot->name ) );
+				?>
+			</h2>
+			<p>
+				<?php esc_html_e( 'Old address:', 'axle-category-tag-trash' ); ?>
+				<code><?php echo esc_html( '/' . $snapshot->path . '/' ); ?></code>
+				<?php if ( $stats && $stats['week'] ) : ?>
+					<span class="axle-muted">
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: %s: number of visits. */
+								_n( 'Visited %s time this week.', 'Visited %s times this week.', $stats['week'], 'axle-category-tag-trash' ),
+								number_format_i18n( $stats['week'] )
+							)
+						);
+						?>
+					</span>
+				<?php endif; ?>
+			</p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( self::ACTION . '_settings' ); ?>
+				<?php wp_nonce_field( self::ACTION . '_old_redirect' ); ?>
 				<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION ); ?>">
-				<input type="hidden" name="task" value="settings">
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><label for="actt-retention"><?php esc_html_e( 'Keep deleted terms for', 'axle-category-tag-trash' ); ?></label></th>
-						<td>
-							<select id="actt-retention" name="retention_days">
-								<?php foreach ( Settings::retention_choices() as $option ) : ?>
-									<option value="<?php echo esc_attr( (string) $option ); ?>" <?php selected( $days, $option ); ?>>
-										<?php
-										/* translators: %d: number of days. */
-										echo esc_html( sprintf( _n( '%d day', '%d days', $option, 'axle-category-tag-trash' ), $option ) );
-										?>
-									</option>
-								<?php endforeach; ?>
-							</select>
-							<p class="description"><?php esc_html_e( 'After this time a term is deleted for good and can no longer be restored.', 'axle-category-tag-trash' ); ?></p>
-						</td>
-					</tr>
-				</table>
-				<p class="submit"><button type="submit" class="button button-primary"><?php esc_html_e( 'Save retention', 'axle-category-tag-trash' ); ?></button></p>
+				<input type="hidden" name="task" value="old_redirect">
+				<input type="hidden" name="item" value="<?php echo esc_attr( (string) $item_id ); ?>">
+				<fieldset class="actt-redirect-old__choice">
+					<legend><?php esc_html_e( 'Send visitors to', 'axle-category-tag-trash' ); ?></legend>
+					<p>
+						<input type="radio" name="target_type" id="actt-target-term" value="term" checked>
+						<label for="actt-target-term"><?php esc_html_e( 'Another term', 'axle-category-tag-trash' ); ?></label>
+						<br>
+						<label class="screen-reader-text" for="actt-target-term-id"><?php esc_html_e( 'Term to send visitors to', 'axle-category-tag-trash' ); ?></label>
+						<?php
+						wp_dropdown_categories(
+							array(
+								'taxonomy'          => $snapshot->taxonomy,
+								'name'              => 'target_term',
+								'id'                => 'actt-target-term-id',
+								'hide_empty'        => 0,
+								'hierarchical'      => is_taxonomy_hierarchical( $snapshot->taxonomy ),
+								'orderby'           => 'name',
+								'number'            => $limit,
+								'show_option_none'  => __( 'Pick a term', 'axle-category-tag-trash' ),
+								'option_none_value' => '0',
+							)
+						);
+						?>
+					</p>
+					<p>
+						<input type="radio" name="target_type" id="actt-target-url" value="url">
+						<label for="actt-target-url"><?php esc_html_e( 'An address on this site', 'axle-category-tag-trash' ); ?></label>
+						<br>
+						<label class="screen-reader-text" for="actt-target-url-text"><?php esc_html_e( 'Address to send visitors to', 'axle-category-tag-trash' ); ?></label>
+						<input type="text" class="regular-text" name="target_url" id="actt-target-url-text" placeholder="/blog/" inputmode="url" autocomplete="off">
+					</p>
+				</fieldset>
+				<p class="description"><?php esc_html_e( 'You can undo this right after. The redirect stops on its own if you restore the term.', 'axle-category-tag-trash' ); ?></p>
+				<div class="axle-actions">
+					<button type="submit" class="button button-primary"><?php esc_html_e( 'Add redirect', 'axle-category-tag-trash' ); ?></button>
+					<a class="button-link" href="<?php echo esc_url( $back ); ?>"><?php esc_html_e( 'Cancel', 'axle-category-tag-trash' ); ?></a>
+				</div>
 			</form>
 		</section>
 		<?php
+	}
+
+	/**
+	 * Adds the redirect from the form, then returns to the trash with an Undo link.
+	 */
+	private function handle_old_redirect(): void {
+		check_admin_referer( self::ACTION . '_old_redirect' );
+
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- Checked on the line above.
+		$item_id = isset( $_POST['item'] ) ? absint( $_POST['item'] ) : 0;
+		$type    = isset( $_POST['target_type'] ) ? sanitize_key( wp_unslash( $_POST['target_type'] ) ) : 'term';
+		$target  = 'url' === $type
+			? array( 'url' => isset( $_POST['target_url'] ) ? sanitize_text_field( wp_unslash( $_POST['target_url'] ) ) : '' )
+			: array( 'term' => isset( $_POST['target_term'] ) ? absint( $_POST['target_term'] ) : 0 );
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		$result = $this->old_addresses->redirect( $item_id, $target );
+
+		if ( is_wp_error( $result ) ) {
+			if ( 403 === ( $result->get_error_data()['status'] ?? 0 ) ) {
+				wp_die( esc_html( $result->get_error_message() ), 403 );
+			}
+
+			wp_safe_redirect(
+				add_query_arg(
+					array(
+						'view'        => 'redirect-old',
+						'item'        => $item_id,
+						'actt_errors' => array( rawurlencode( $result->get_error_message() ) ),
+					),
+					admin_url( 'tools.php?page=' . self::SLUG )
+				)
+			);
+			exit;
+		}
+
+		wp_safe_redirect( add_query_arg( 'actt_old_redirect', md5( $result['path'] ), admin_url( 'tools.php?page=' . self::SLUG ) ) );
+		exit;
+	}
+
+	/**
+	 * Takes away a redirect that was just added from the trash.
+	 *
+	 * @param string $id Redirect ID, the MD5 of its old path.
+	 */
+	private function handle_old_redirect_undo( string $id ): void {
+		$key   = Redirects::resolve_key( $id );
+		$entry = '' !== $key ? ( Redirects::all()[ $key ] ?? null ) : null;
+		$args  = array( 'actt_old_redirect_undone' => '1' );
+
+		if ( $entry && ! Access::can( $entry['taxonomy'], Access::REDIRECTS ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to remove redirects of this taxonomy.', 'axle-category-tag-trash' ), 403 );
+		}
+
+		if ( ! $entry ) {
+			$args = array( 'actt_errors' => array( rawurlencode( __( 'That redirect is already gone.', 'axle-category-tag-trash' ) ) ) );
+		} else {
+			$this->redirects->remove( array( $key ) );
+		}
+
+		wp_safe_redirect( add_query_arg( $args, admin_url( 'tools.php?page=' . self::SLUG ) ) );
+		exit;
 	}
 
 	/**
@@ -812,6 +986,8 @@ final class TrashPage implements Service {
 		$errors   = isset( $_GET['actt_errors'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_GET['actt_errors'] ) ) : array();
 		$merged   = isset( $_GET['actt_merged'] ) ? array_filter( array_map( 'absint', explode( ',', sanitize_text_field( wp_unslash( $_GET['actt_merged'] ) ) ) ) ) : array();
 		$merging  = isset( $_GET['actt_merging'] ) ? absint( $_GET['actt_merging'] ) : 0;
+		$added    = isset( $_GET['actt_old_redirect'] ) ? sanitize_text_field( wp_unslash( $_GET['actt_old_redirect'] ) ) : '';
+		$taken    = isset( $_GET['actt_old_redirect_undone'] );
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		self::print_restored_notice( $restored, $notes );
@@ -822,6 +998,12 @@ final class TrashPage implements Service {
 			printf( '<div class="notice notice-success is-dismissible"><p>%s</p></div>', esc_html( sprintf( _n( '%d term deleted for good.', '%d terms deleted for good.', $deleted, 'axle-category-tag-trash' ), $deleted ) ) );
 		}
 
+		$this->print_old_redirect_notice( $added );
+
+		if ( $taken ) {
+			printf( '<div class="notice notice-success is-dismissible" role="status"><p>%s</p></div>', esc_html__( 'Took the redirect away. The old address shows a 404 again.', 'axle-category-tag-trash' ) );
+		}
+
 		if ( $saved ) {
 			printf( '<div class="notice notice-success is-dismissible"><p>%s</p></div>', esc_html__( 'Settings saved.', 'axle-category-tag-trash' ) );
 		}
@@ -829,6 +1011,35 @@ final class TrashPage implements Service {
 		foreach ( $errors as $error ) {
 			printf( '<div class="notice notice-error"><p>%s</p></div>', esc_html( $error ) );
 		}
+	}
+
+	/**
+	 * Prints "Redirecting ..." with an Undo link, after a redirect was added from the trash.
+	 *
+	 * @param string $id Redirect ID, the MD5 of its old path.
+	 */
+	private function print_old_redirect_notice( string $id ): void {
+		$key   = '' !== $id ? Redirects::resolve_key( $id ) : '';
+		$entry = '' !== $key ? ( Redirects::all()[ $key ] ?? null ) : null;
+
+		// Nothing is shown for a redirect of a taxonomy this user may not change.
+		if ( ! $entry || ! Access::can( $entry['taxonomy'], Access::REDIRECTS ) ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-success is-dismissible actt-old-redirect" role="status"><p>%1$s <a href="%2$s" class="button button-small">%3$s</a></p></div>',
+			esc_html(
+				sprintf(
+					/* translators: 1: old address, 2: new address. */
+					__( 'Redirecting %1$s to %2$s.', 'axle-category-tag-trash' ),
+					'/' . $key . '/',
+					Redirects::target_url( $key, $entry )
+				)
+			),
+			esc_url( RedirectsTab::action_url( 'old_redirect_undo', md5( $key ) ) ),
+			esc_html__( 'Undo', 'axle-category-tag-trash' )
+		);
 	}
 
 	/**
@@ -972,6 +1183,15 @@ final class TrashPage implements Service {
 			$this->trash->settings()->set_retention_days( isset( $_POST['retention_days'] ) ? absint( $_POST['retention_days'] ) : 30 );
 			wp_safe_redirect( add_query_arg( 'actt_saved', '1', $back ) );
 			exit;
+		}
+
+		if ( 'old_redirect' === $task ) {
+			$this->handle_old_redirect();
+		}
+
+		if ( 'old_redirect_undo' === $task ) {
+			check_admin_referer( self::ACTION . '_' . $task . '_' . $items );
+			$this->handle_old_redirect_undo( $items );
 		}
 
 		if ( in_array( $task, array( 'redirect_remove', 'redirect_undo' ), true ) ) {

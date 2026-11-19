@@ -190,9 +190,10 @@ test.describe( 'Axle Category & Tag Trash', () => {
 		await expect( page.getByRole( 'button', { name: 'Empty trash' } ) ).toHaveCount( 0 );
 
 		await page.locator( '#actt-retention' ).selectOption( '90' );
-		await page.getByRole( 'button', { name: 'Save retention' } ).click();
 		await expect( page.locator( '.notice-success' ) ).toContainText( 'Settings saved.' );
-		await expect( page.locator( '.actt-intro' ) ).toContainText( 'kept here for 90 days' );
+		await expect( page.locator( '#actt-retention' ) ).toHaveValue( '90' );
+		expect( JSON.parse( wp( 'option', 'get', 'axle_category_tag_trash_settings', '--format=json' ) ).retention_days ).toBe( 90 );
+		await expect( page.getByRole( 'button', { name: 'Save retention' } ) ).toHaveCount( 0 );
 		wp( 'option', 'delete', 'axle_category_tag_trash_settings' );
 	} );
 
@@ -280,7 +281,7 @@ test.describe( 'Axle Category & Tag Trash', () => {
 		const path = ( name ) => `/wp-abilities/v1/abilities/axle-category-tag-trash/${ name }/run`;
 
 		const listed = await rest( 'GET', '/wp-abilities/v1/abilities?category=axle-category-tag-trash' );
-		expect( listed.body.map( ( ability ) => ability.name ).sort() ).toEqual( [ 'axle-category-tag-trash/delete', 'axle-category-tag-trash/list', 'axle-category-tag-trash/list-redirects', 'axle-category-tag-trash/merge', 'axle-category-tag-trash/preview-merge', 'axle-category-tag-trash/remove-redirect', 'axle-category-tag-trash/restore' ] );
+		expect( listed.body.map( ( ability ) => ability.name ).sort() ).toEqual( [ 'axle-category-tag-trash/delete', 'axle-category-tag-trash/list', 'axle-category-tag-trash/list-old-address-visits', 'axle-category-tag-trash/list-redirects', 'axle-category-tag-trash/merge', 'axle-category-tag-trash/preview-merge', 'axle-category-tag-trash/redirect-old-address', 'axle-category-tag-trash/remove-redirect', 'axle-category-tag-trash/restore' ] );
 		// MCP clients only list abilities marked public.
 		expect( JSON.parse( wpEval( `echo wp_json_encode( array_values( array_filter( array_map( function ( $ability ) { $meta = $ability->get_meta(); return ( ! empty( $meta['public'] ) && ! empty( $meta['mcp']['public'] ) ) ? '' : $ability->get_name(); }, wp_get_abilities() ), function ( $name ) { return 0 === strpos( $name, 'axle-category-tag-trash/' ); } ) ) );` ) ) ).toEqual( [] );
 

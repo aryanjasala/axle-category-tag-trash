@@ -705,6 +705,437 @@
           "--yes"
         ]
       ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash with an old address that still gets visits",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y gone",
+            "--porcelain"
+          ],
+          "save": "gone"
+        },
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y keeper",
+            "--porcelain"
+          ],
+          "save": "keeper"
+        },
+        [
+          "term",
+          "delete",
+          "category",
+          "{gone}"
+        ],
+        [
+          "eval",
+          "$d = gmdate( 'Ymd' ); update_option( 'axle_category_tag_trash_old_hits', array( 'category/a11y-gone' => array( 'n' => 42, 'last' => time(), 'd' => array( $d => 42 ) ) ), false );"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "category",
+          "{keeper}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirects"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirect_hits"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_old_hits"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_old_paths"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash, redirect an old address",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y gone",
+            "--porcelain"
+          ],
+          "save": "gone"
+        },
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y keeper",
+            "--porcelain"
+          ],
+          "save": "keeper"
+        },
+        [
+          "term",
+          "delete",
+          "category",
+          "{gone}"
+        ],
+        [
+          "eval",
+          "$d = gmdate( 'Ymd' ); update_option( 'axle_category_tag_trash_old_hits', array( 'category/a11y-gone' => array( 'n' => 42, 'last' => time(), 'd' => array( $d => 42 ) ) ), false );"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
+      "steps": [
+        {
+          "hover": "#the-list tr"
+        },
+        {
+          "click": ".actt-redirect-old-link"
+        },
+        {
+          "waitFor": ".actt-redirect-old"
+        }
+      ],
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "category",
+          "{keeper}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirects"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirect_hits"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_old_hits"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_old_paths"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash, redirect an old address to an address",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y gone",
+            "--porcelain"
+          ],
+          "save": "gone"
+        },
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y keeper",
+            "--porcelain"
+          ],
+          "save": "keeper"
+        },
+        [
+          "term",
+          "delete",
+          "category",
+          "{gone}"
+        ],
+        [
+          "eval",
+          "$d = gmdate( 'Ymd' ); update_option( 'axle_category_tag_trash_old_hits', array( 'category/a11y-gone' => array( 'n' => 42, 'last' => time(), 'd' => array( $d => 42 ) ) ), false );"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
+      "steps": [
+        {
+          "hover": "#the-list tr"
+        },
+        {
+          "click": ".actt-redirect-old-link"
+        },
+        {
+          "waitFor": ".actt-redirect-old"
+        },
+        {
+          "click": "#actt-target-url"
+        },
+        {
+          "fill": "#actt-target-url-text",
+          "value": "/blog/"
+        }
+      ],
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "category",
+          "{keeper}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirects"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirect_hits"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_old_hits"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_old_paths"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash after a redirect was added, with Undo",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y gone",
+            "--porcelain"
+          ],
+          "save": "gone"
+        },
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y keeper",
+            "--porcelain"
+          ],
+          "save": "keeper"
+        },
+        [
+          "term",
+          "delete",
+          "category",
+          "{gone}"
+        ],
+        [
+          "eval",
+          "$d = gmdate( 'Ymd' ); update_option( 'axle_category_tag_trash_old_hits', array( 'category/a11y-gone' => array( 'n' => 42, 'last' => time(), 'd' => array( $d => 42 ) ) ), false );"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
+      "steps": [
+        {
+          "hover": "#the-list tr"
+        },
+        {
+          "click": ".actt-redirect-old-link"
+        },
+        {
+          "waitFor": ".actt-redirect-old"
+        },
+        {
+          "fill": "#actt-target-url-text",
+          "value": "/blog/"
+        },
+        {
+          "click": "#actt-target-url"
+        },
+        {
+          "click": ".actt-redirect-old button.button-primary"
+        },
+        {
+          "waitFor": ".actt-old-redirect"
+        }
+      ],
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "category",
+          "{keeper}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirects"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirect_hits"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_old_hits"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_old_paths"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash, redirect an old address with an error",
+      "setup": [
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y gone",
+            "--porcelain"
+          ],
+          "save": "gone"
+        },
+        {
+          "wp": [
+            "term",
+            "create",
+            "category",
+            "A11y keeper",
+            "--porcelain"
+          ],
+          "save": "keeper"
+        },
+        [
+          "term",
+          "delete",
+          "category",
+          "{gone}"
+        ],
+        [
+          "eval",
+          "$d = gmdate( 'Ymd' ); update_option( 'axle_category_tag_trash_old_hits', array( 'category/a11y-gone' => array( 'n' => 42, 'last' => time(), 'd' => array( $d => 42 ) ) ), false );"
+        ]
+      ],
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash",
+      "steps": [
+        {
+          "hover": "#the-list tr"
+        },
+        {
+          "click": ".actt-redirect-old-link"
+        },
+        {
+          "waitFor": ".actt-redirect-old"
+        },
+        {
+          "click": "#actt-target-url"
+        },
+        {
+          "fill": "#actt-target-url-text",
+          "value": "https://elsewhere.example/"
+        },
+        {
+          "click": ".actt-redirect-old button.button-primary"
+        },
+        {
+          "waitFor": ".notice-error"
+        }
+      ],
+      "cleanup": [
+        [
+          "term",
+          "delete",
+          "category",
+          "{keeper}"
+        ],
+        [
+          "axle-category-tag-trash",
+          "delete",
+          "--all",
+          "--yes"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirects"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_redirect_hits"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_old_hits"
+        ],
+        [
+          "option",
+          "delete",
+          "axle_category_tag_trash_old_paths"
+        ]
+      ]
+    },
+    {
+      "name": "Tools > Category & Tag Trash, redirect an old address that cannot be redirected",
+      "url": "/wp-admin/tools.php?page=axle-category-tag-trash&view=redirect-old&item=999999"
     }
   ],
   "skip": {}

@@ -50,18 +50,27 @@ final class Abilities implements Service {
 	private Redirects $redirects;
 
 	/**
+	 * Visits to the old addresses of trashed terms.
+	 *
+	 * @var OldAddresses
+	 */
+	private OldAddresses $old_addresses;
+
+	/**
 	 * Sets up the abilities.
 	 *
-	 * @param Trash     $trash     Trashed terms.
-	 * @param Restorer  $restorer  Restore logic.
-	 * @param Merger    $merger    Merge logic.
-	 * @param Redirects $redirects Redirects.
+	 * @param Trash        $trash     Trashed terms.
+	 * @param Restorer     $restorer  Restore logic.
+	 * @param Merger       $merger    Merge logic.
+	 * @param Redirects    $redirects     Redirects.
+	 * @param OldAddresses $old_addresses Visits to the old addresses of trashed terms.
 	 */
-	public function __construct( Trash $trash, Restorer $restorer, Merger $merger, Redirects $redirects ) {
-		$this->redirects = $redirects;
-		$this->trash     = $trash;
-		$this->restorer  = $restorer;
-		$this->merger    = $merger;
+	public function __construct( Trash $trash, Restorer $restorer, Merger $merger, Redirects $redirects, OldAddresses $old_addresses ) {
+		$this->old_addresses = $old_addresses;
+		$this->redirects     = $redirects;
+		$this->trash         = $trash;
+		$this->restorer      = $restorer;
+		$this->merger        = $merger;
 	}
 
 	/**
@@ -404,6 +413,176 @@ final class Abilities implements Service {
 				'idempotent'  => true,
 			)
 		);
+
+		$this->ability(
+			'list-old-address-visits',
+			__( 'List deleted terms whose old address still gets visits', 'axle-category-tag-trash' ),
+			__( 'Trashed terms whose old address got visits (404s) in the last seven days and does not redirect yet, most visited first. Known bots are not counted.', 'axle-category-tag-trash' ),
+			array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'taxonomy' => array(
+						'type'        => 'string',
+						'description' => __( 'Only this taxonomy, such as category or post_tag.', 'axle-category-tag-trash' ),
+					),
+					'minimum'  => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'default'     => 1,
+						'description' => __( 'Fewest visits in the last seven days.', 'axle-category-tag-trash' ),
+					),
+					'limit'    => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+						'maximum' => 100,
+						'default' => 20,
+					),
+				),
+				'additionalProperties' => false,
+			),
+			array(
+				'type'       => 'object',
+				'properties' => array(
+					'items' => array(
+						'type'  => 'array',
+						'items' => array(
+							'type'       => 'object',
+							'properties' => array(
+								'id'          => array( 'type' => 'integer' ),
+								'term_id'     => array( 'type' => 'integer' ),
+								'name'        => array( 'type' => 'string' ),
+								'taxonomy'    => array( 'type' => 'string' ),
+								'old_url'     => array( 'type' => 'string' ),
+								'visits_week' => array( 'type' => 'integer' ),
+								'visits'      => array( 'type' => 'integer' ),
+								'last_visit'  => array( 'type' => 'string' ),
+							),
+						),
+					),
+				),
+			),
+			array( $this, 'list_old_address_visits' ),
+			array( $this, 'can_list_old_address_visits' ),
+			array(
+				'readonly'    => true,
+				'destructive' => false,
+				'idempotent'  => true,
+			)
+		);
+
+		$this->ability(
+			'redirect-old-address',
+			__( 'Redirect the old address of a deleted term', 'axle-category-tag-trash' ),
+			__( 'Adds a redirect from the address a trashed term had to another term of the same taxonomy, or to an address on this site. Remove it with remove-redirect.', 'axle-category-tag-trash' ),
+			array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'id'   => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'Trash item ID from axle-category-tag-trash/list. Not the term ID.', 'axle-category-tag-trash' ),
+					),
+					'term' => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'Term ID to send visitors to, in the same taxonomy.', 'axle-category-tag-trash' ),
+					),
+					'url'  => array(
+						'type'        => 'string',
+						'description' => __( 'Address on this site to send visitors to, such as /blog/. Used instead of term when given.', 'axle-category-tag-trash' ),
+					),
+				),
+				'required'             => array( 'id' ),
+				'additionalProperties' => false,
+			),
+			array(
+				'type'       => 'object',
+				'properties' => array(
+					'path'    => array( 'type' => 'string' ),
+					'old_url' => array( 'type' => 'string' ),
+					'new_url' => array( 'type' => 'string' ),
+				),
+			),
+			array( $this, 'redirect_old_address' ),
+			array( $this, 'can_redirect_old_address' ),
+			array(
+				'readonly'    => false,
+				'destructive' => false,
+				'idempotent'  => false,
+			)
+		);
+	}
+
+	/**
+	 * Ability: old addresses of trashed terms that still get visits.
+	 *
+	 * @param array|null $input Ability input.
+	 * @return array{items: array[]}|\WP_Error
+	 */
+	public function list_old_address_visits( $input = null ) {
+		$input    = (array) $input;
+		$taxonomy = Access::taxonomy_name( $input['taxonomy'] ?? '' );
+
+		if ( '' !== $taxonomy && ! Access::can( $taxonomy, Access::REDIRECTS ) ) {
+			return new \WP_Error( 'axle_category_tag_trash_forbidden', __( 'Sorry, you are not allowed to see visits to old addresses of this taxonomy.', 'axle-category-tag-trash' ), array( 'status' => 403 ) );
+		}
+
+		$items = array();
+		foreach ( array_slice( $this->old_addresses->visited( max( 1, (int) ( $input['minimum'] ?? 1 ) ), $taxonomy ), 0, max( 1, min( 100, (int) ( $input['limit'] ?? 20 ) ) ) ) as $row ) {
+			$items[] = array(
+				'id'          => $row['item_id'],
+				'term_id'     => $row['term_id'],
+				'name'        => $row['name'],
+				'taxonomy'    => $row['taxonomy'],
+				'old_url'     => home_url( user_trailingslashit( $row['path'] ) ),
+				'visits_week' => $row['week'],
+				'visits'      => $row['total'],
+				'last_visit'  => $row['last'] ? gmdate( 'c', (int) $row['last'] ) : '',
+			);
+		}
+
+		return array( 'items' => $items );
+	}
+
+	/**
+	 * Ability: redirects the old address of a trashed term.
+	 *
+	 * @param array|null $input Ability input.
+	 * @return array{path: string, old_url: string, new_url: string}|\WP_Error
+	 */
+	public function redirect_old_address( $input = null ) {
+		$input  = (array) $input;
+		$target = isset( $input['url'] ) && '' !== (string) $input['url'] ? array( 'url' => (string) $input['url'] ) : array( 'term' => (int) ( $input['term'] ?? 0 ) );
+		$result = $this->old_addresses->redirect( (int) ( $input['id'] ?? 0 ), $target );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return array(
+			'path'    => $result['path'],
+			'old_url' => home_url( user_trailingslashit( $result['path'] ) ),
+			'new_url' => $result['new_url'],
+		);
+	}
+
+	/**
+	 * Permission to redirect an old address: the screen's capability, and the right to change redirects of the item's own taxonomy.
+	 *
+	 * @param array|null $input Ability input.
+	 * @return bool
+	 */
+	public function can_redirect_old_address( $input = null ): bool {
+		return $this->can_item( $input, Access::REDIRECTS );
+	}
+
+	/**
+	 * Permission to read visits: the screen's capability. The list holds only taxonomies the user may change redirects of.
+	 *
+	 * @return bool
+	 */
+	public function can_list_old_address_visits(): bool {
+		return current_user_can( TrashPage::capability() );
 	}
 
 	/**
