@@ -9,6 +9,7 @@ namespace AryanX\Axle\CategoryTagTrash\Cli;
 
 use AryanX\Axle\CategoryTagTrash\Access;
 use AryanX\Axle\CategoryTagTrash\Merger;
+use AryanX\Axle\CategoryTagTrash\OldAddresses;
 use AryanX\Axle\CategoryTagTrash\Purger;
 use AryanX\Axle\CategoryTagTrash\Redirects;
 use AryanX\Axle\CategoryTagTrash\Restorer;
@@ -57,20 +58,29 @@ final class Command {
 	private Redirects $redirects;
 
 	/**
+	 * Visits to the old addresses of trashed terms.
+	 *
+	 * @var OldAddresses
+	 */
+	private OldAddresses $old_addresses;
+
+	/**
 	 * Sets up the command.
 	 *
-	 * @param Trash     $trash     Trashed terms.
-	 * @param Restorer  $restorer  Restore logic.
-	 * @param Purger    $purger    Purging and emptying.
-	 * @param Merger    $merger    Merging terms.
-	 * @param Redirects $redirects Old term addresses that redirect.
+	 * @param Trash        $trash     Trashed terms.
+	 * @param Restorer     $restorer  Restore logic.
+	 * @param Purger       $purger    Purging and emptying.
+	 * @param Merger       $merger    Merging terms.
+	 * @param Redirects    $redirects     Old term addresses that redirect.
+	 * @param OldAddresses $old_addresses Visits to the old addresses of trashed terms.
 	 */
-	public function __construct( Trash $trash, Restorer $restorer, Purger $purger, Merger $merger, Redirects $redirects ) {
-		$this->redirects = $redirects;
-		$this->trash     = $trash;
-		$this->restorer  = $restorer;
-		$this->purger    = $purger;
-		$this->merger    = $merger;
+	public function __construct( Trash $trash, Restorer $restorer, Purger $purger, Merger $merger, Redirects $redirects, OldAddresses $old_addresses ) {
+		$this->old_addresses = $old_addresses;
+		$this->redirects     = $redirects;
+		$this->trash         = $trash;
+		$this->restorer      = $restorer;
+		$this->purger        = $purger;
+		$this->merger        = $merger;
 	}
 
 	/**
@@ -289,6 +299,100 @@ final class Command {
 				\WP_CLI::success( 'Deleted trash item ' . $item_id . '.' );
 			}
 		}
+	}
+
+	/**
+	 * Lists deleted terms whose old address still gets visits (404s), most visited first.
+	 *
+	 * Visits are counted for the addresses of trashed terms only, not for known bots,
+	 * and only while the address does not redirect.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--min=<visits>]
+	 * : Fewest visits in the last seven days.
+	 * ---
+	 * default: 1
+	 * ---
+	 *
+	 * [--taxonomy=<taxonomy>]
+	 * : Only this taxonomy.
+	 *
+	 * [--format=<format>]
+	 * : table, csv, json, count or ids (the trash item IDs).
+	 * ---
+	 * default: table
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp axle-category-tag-trash old-addresses --min=10
+	 *
+	 * @subcommand old-addresses
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Named arguments.
+	 */
+	public function old_addresses( array $args, array $assoc_args ): void {
+		$rows   = $this->old_addresses->visited( max( 1, (int) ( $assoc_args['min'] ?? 1 ) ), Access::taxonomy_name( $assoc_args['taxonomy'] ?? '' ), false );
+		$format = $assoc_args['format'] ?? 'table';
+
+		if ( 'ids' === $format ) {
+			\WP_CLI::line( implode( ' ', wp_list_pluck( $rows, 'item_id' ) ) );
+			return;
+		}
+
+		$out = array();
+		foreach ( $rows as $row ) {
+			$out[] = array(
+				'id'       => $row['item_id'],
+				'name'     => $row['name'],
+				'taxonomy' => $row['taxonomy'],
+				'old'      => $row['path'],
+				'week'     => $row['week'],
+				'total'    => $row['total'],
+				'last'     => $row['last'] ? gmdate( 'Y-m-d H:i:s', (int) $row['last'] ) : '',
+			);
+		}
+
+		\WP_CLI\Utils\format_items( $format, $out, array( 'id', 'name', 'taxonomy', 'old', 'week', 'total', 'last' ) );
+	}
+
+	/**
+	 * Redirects the old address of a deleted term, after the delete.
+	 *
+	 * Undo it with `wp axle-category-tag-trash redirects remove <old path>`.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <id>
+	 * : Trash item ID from `wp axle-category-tag-trash list`.
+	 *
+	 * [--term=<term-id>]
+	 * : Term in the same taxonomy to send visitors to.
+	 *
+	 * [--url=<url>]
+	 * : Address on this site to send visitors to, such as /blog/.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp axle-category-tag-trash redirect-old 31 --term=12
+	 *     wp axle-category-tag-trash redirect-old 31 --url=/blog/
+	 *
+	 * @subcommand redirect-old
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Named arguments.
+	 */
+	public function redirect_old( array $args, array $assoc_args ): void {
+		$target = isset( $assoc_args['url'] ) ? array( 'url' => (string) $assoc_args['url'] ) : array( 'term' => (int) ( $assoc_args['term'] ?? 0 ) );
+		$result = $this->old_addresses->redirect( (int) ( $args[0] ?? 0 ), $target, false );
+
+		if ( is_wp_error( $result ) ) {
+			\WP_CLI::error( $result->get_error_message() );
+		}
+
+		\WP_CLI::success( 'Redirecting /' . $result['path'] . '/ to ' . $result['new_url'] . '.' );
 	}
 
 	/**

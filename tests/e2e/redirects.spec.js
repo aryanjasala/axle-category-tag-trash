@@ -139,6 +139,7 @@ test.describe( 'Old term links keep working', () => {
 
 		const id = term( 'category', 'Tab before' );
 		wp( 'term', 'update', 'category', String( id ), '--slug=tab-after' );
+		// Two visits in the same minute write once: without an object cache a visit never writes every time.
 		await hit( request, '/category/tab-before/' );
 		await hit( request, '/category/tab-before/' );
 
@@ -149,7 +150,7 @@ test.describe( 'Old term links keep working', () => {
 		await expect( row.locator( '.actt-old' ) ).toHaveText( '/category/tab-before/' );
 		await expect( row.locator( '.actt-new' ) ).toHaveText( '/category/tab-after/' );
 		await expect( row ).toContainText( 'Slug changed' );
-		await expect( row.locator( 'td' ).nth( 4 ) ).toContainText( '2' );
+		await expect( row.locator( 'td' ).nth( 4 ) ).toContainText( '1' );
 
 		await row.getByRole( 'link', { name: /Remove the redirect from/ } ).click();
 		await expect( page.locator( '.actt-row-confirm' ) ).toContainText( 'You can undo this right after.' );
@@ -162,7 +163,7 @@ test.describe( 'Old term links keep working', () => {
 		await page.getByRole( 'link', { name: 'Undo' } ).click();
 		await expect( page.locator( '.notice-success' ) ).toContainText( 'Put back 1 redirect.' );
 		expect( paths() ).toEqual( [ 'category/tab-before' ] );
-		await expect( page.locator( '.actt-redirects tbody tr td' ).nth( 4 ) ).toContainText( '2' );
+		await expect( page.locator( '.actt-redirects tbody tr td' ).nth( 4 ) ).toContainText( '1' );
 		expect( ( await hit( request, '/category/tab-before/' ) ).status ).toBe( 301 );
 	} );
 

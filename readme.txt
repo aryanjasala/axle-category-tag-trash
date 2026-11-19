@@ -14,7 +14,7 @@ A trash for categories, tags and custom terms. Deleted a category by mistake? Re
 
 Posts and pages go to the trash when you delete them. Categories and tags don't: one click on "Delete" and the term is gone. WordPress also moves its posts to "Uncategorized", moves its child categories up a level and removes it from your menus. Getting it back means restoring a database backup.
 
-Axle Category & Tag Trash keeps every deleted term for 30 days (or 7, 90 or 365, your choice).
+Axle Category & Tag Trash keeps every deleted term for 30 days (or 7, 90 or 365, your choice, from a select at the top of the trash screen that saves when you change it).
 
 **Undo** appears the moment you delete a term, on the Categories, Tags or any other term screen, for single and bulk deletes. **Restore** later from Tools > Axle Category & Tag Trash puts back:
 
@@ -30,6 +30,8 @@ Keeping the same ID matters: navigation blocks, widgets and shortcodes that poin
 **Merge** terms when you have the same thing twice: "WordPress", "wordpress" and "Word Press" as three tags. Choose "Merge into..." on a term, or in the bulk actions, pick the term to keep and read the preview. Every post of the old term moves to the one you kept, and the old term goes to the trash. If it was the wrong call, "Undo merge" brings the old term back on all its posts and takes the other term off only the posts that got it through the merge. Posts that already had both keep both. Big merges run in the background with a progress bar.
 
 **Old links keep working.** Change a category's slug, move it under another parent, or merge it, and its old address sends visitors and search engines to the new one with a 301 redirect, instead of a 404. Feeds and numbered pages of the old address are sent along. The **Redirects** tab on Tools > Axle Category & Tag Trash lists each old address with its new address, why it redirects, since when and how many times it was used. Remove one and use Undo if that was a mistake. To redirect a term you are about to delete, pick a target under "If this term is deleted" on its edit screen. If you rename a term twice, the first old address goes straight to the last one, so redirects never chain.
+
+**Deleted terms that still get visits.** When people land on the old address of a deleted category and get a 404, its trash row says so: "Old address visited 42 times this week". Choose "Redirect its old address..." on the row to send it to another term or to an address on your site, and use Undo if that was a mistake. Only addresses of trashed terms are counted, known bots are skipped, and a visit never writes to the database every time. Site Health tells you when a deleted term's address keeps getting visits. Counts and the redirect form only show to people who may change that taxonomy.
 
 Who can do what follows the taxonomy's own capabilities. A user who manages tags but not a custom taxonomy never sees, restores, deletes, merges or redirects that taxonomy's terms, on the screen or through the Abilities API.
 
@@ -50,6 +52,8 @@ Free and open source under the GPL. No pro version, no upsells, no ads in wp-adm
 * `wp axle-category-tag-trash merge <source> <target> --taxonomy=post_tag` (add `--dry-run` to preview)
 * `wp axle-category-tag-trash restore <id>...`
 * `wp axle-category-tag-trash delete <id>...` or `wp axle-category-tag-trash delete --all`
+* `wp axle-category-tag-trash old-addresses --min=10` lists deleted terms whose old address gets visits
+* `wp axle-category-tag-trash redirect-old <id> --term=<term-id>` (or `--url=/blog/`)
 * `wp axle-category-tag-trash redirects list` and `wp axle-category-tag-trash redirects remove <old-path>...`
 
 **Try it before you install.** [try.axlewp.com/axle-category-tag-trash](https://try.axlewp.com/axle-category-tag-trash) opens a private WordPress in your browser with this plugin and some demo content.
@@ -105,8 +109,10 @@ Yes. The posts are saved in small chunks, so the trash stays light. A restore br
 == Screenshots ==
 
 1. Undo right after deleting a category.
-2. Tools > Axle Category & Tag Trash.
+2. Tools > Category & Tag Trash, with a deleted category whose old address still gets visits.
 3. What a restore brings back.
+4. Redirecting the old address of a deleted category.
+5. The Redirects tab.
 
 == Changelog ==
 

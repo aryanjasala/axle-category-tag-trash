@@ -60,6 +60,15 @@ final class Snapshot {
 	public string $slug = '';
 
 	/**
+	 * Archive address of the term when it was deleted, relative to the site address, such as "category/recipes".
+	 *
+	 * Empty when the taxonomy has no archive addresses, or for terms trashed before addresses were kept.
+	 *
+	 * @var string
+	 */
+	public string $path = '';
+
+	/**
 	 * Term description.
 	 *
 	 * @var string

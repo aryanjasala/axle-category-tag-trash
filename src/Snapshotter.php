@@ -183,6 +183,7 @@ final class Snapshotter implements Service {
 		$snapshot->name             = $term->name;
 		$snapshot->slug             = $term->slug;
 		$snapshot->description      = $term->description;
+		$snapshot->path             = Redirects::enabled() && Redirects::supports( $taxonomy ) ? (string) Redirects::term_path( $term ) : '';
 		$snapshot->parent           = (int) $term->parent;
 		$snapshot->term_group       = (int) $term->term_group;
 		$snapshot->meta             = (array) get_term_meta( $term->term_id );

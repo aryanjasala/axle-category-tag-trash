@@ -36,8 +36,14 @@
 | `axle_category_tag_trash_redirect_choices_limit` | filter | `( int $limit, string $taxonomy )`. Terms offered under "If this term is deleted". Default 200 |
 | `axle_category_tag_trash_redirects_per_page` | filter | `( int $per_page )`. Rows per page on the Redirects tab. Default 50 |
 | `axle_category_tag_trash_redirect_removed_notice` | filter | `( string $message, int $removed )`. Text of the notice after a redirect is removed |
-| `axle_category_tag_trash_redirect_added` | action | `( string $old_path, array $entry )`. An old address now redirects. `$old_path` is relative to the site address. `$entry` has `taxonomy`, `term` (the target term ID), `old_term`, `kind` (`rename`, `move`, `merge` or `trash`), `created` and `chain` |
+| `axle_category_tag_trash_redirect_added` | action | `( string $old_path, array $entry )`. An old address now redirects. `$old_path` is relative to the site address. `$entry` has `taxonomy`, `term` (the target term ID), `old_term`, `url` (a fixed target on this site, when `term` is 0), `kind` (`rename`, `move`, `merge`, `trash` or `manual`, added from the trash), `created` and `chain` |
 | `axle_category_tag_trash_redirect_removed` | action | `( string $old_path, array $entry )`. An old address stopped redirecting |
+| `axle_category_tag_trash_old_address_counting` | filter | `( bool $enabled )`. Return `false` to stop counting visits to the old addresses of trashed terms. Default `true` |
+| `axle_category_tag_trash_bot_agents` | filter | `( string[] $needles )`. Lower case parts of a user agent that mark a visit as not a person (bots, link checkers, scripts). An empty user agent is also skipped |
+| `axle_category_tag_trash_hit_buffer` | filter | `( bool $buffered )`. Whether visit counts wait in the object cache and are written once an hour. Default `true` with a persistent object cache |
+| `axle_category_tag_trash_hit_write_interval` | filter | `( int $seconds )`. Without a persistent object cache, the shortest time between two database writes for one address. Default 60, 0 writes every visit |
+| `axle_category_tag_trash_old_visits_threshold` | filter | `( int $visits )`. Visits in seven days that make Site Health recommend a redirect. Default 10 |
+| `axle_category_tag_trash_old_address_visited` | action | `( string $old_path, int $item_id )`. A person got a 404 on the old address of a trashed term |
 | `axle_category_tag_trash_redirected` | action | `( string $path, string $url, array $entry )`. Just before a request is redirected |
 
 ```php
@@ -65,6 +71,8 @@ On WordPress 6.9 and later, Axle Category & Tag Trash registers [abilities](http
 | `axle-category-tag-trash/preview-merge` | Read-only. What merging `source` into `target` would do: posts that move, posts that already have the target, child terms, menu links. Input: `taxonomy`, `source`, `target`, `children` | as `merge` |
 | `axle-category-tag-trash/merge` | Moves every post of `source` to `target` and trashes `source`. Destructive, but restoring the trash item undoes it. Returns `item_id` once done, or `done: false` while the rest runs in the background | the Axle Category & Tag Trash capability, `manage_terms`, `edit_terms` and `delete_terms` of the taxonomy, `delete_term` on the source and `edit_term` on the target |
 | `axle-category-tag-trash/list-redirects` | Read-only. Old term addresses that redirect, newest first, with `new_url`, `kind`, `hits` and `target_gone`. Input: `taxonomy`, `search`, `limit`, `page` | the Axle Category & Tag Trash capability, and `manage_terms` of the taxonomy. Taxonomies you cannot manage are left out, and asking for one is a 403 |
+| `axle-category-tag-trash/list-old-address-visits` | Read-only. Trashed terms whose old address got visits in the last seven days and does not redirect, most visited first. Input: `taxonomy`, `minimum`, `limit` | the Axle Category & Tag Trash capability, and `manage_terms` and `edit_terms` of the taxonomy. Others are left out |
+| `axle-category-tag-trash/redirect-old-address` | Adds a redirect from a trashed term's old address to a term (`term`) of the same taxonomy or an address on this site (`url`). Not destructive. Remove it with `remove-redirect` | the Axle Category & Tag Trash capability, and `manage_terms` and `edit_terms` of the term's taxonomy |
 | `axle-category-tag-trash/remove-redirect` | Stops the old address `path` (from `list-redirects`) from redirecting. Destructive, so the REST API runs it with `DELETE` | the Axle Category & Tag Trash capability, and `manage_terms` and `edit_terms` of the redirect's taxonomy |
 
 ## WP-CLI
@@ -77,6 +85,8 @@ wp axle-category-tag-trash delete <id>...
 wp axle-category-tag-trash delete --all [--yes]
 wp axle-category-tag-trash redirects list [--taxonomy=<taxonomy>] [--format=table|csv|json|count|ids]
 wp axle-category-tag-trash redirects remove <old-path>...
+wp axle-category-tag-trash old-addresses [--min=<visits>] [--taxonomy=<taxonomy>] [--format=table|csv|json|count|ids]
+wp axle-category-tag-trash redirect-old <id> (--term=<term-id> | --url=<url>)
 ```
 
 `redirects list` shows each old address as a path such as `topics/seo`, where it leads now, why, its hits and when it was made. `redirects remove` takes those paths. To redirect a term before you delete it, set its target with `wp term meta update <term-id> axle_category_tag_trash_redirect_to <target-term-id>`.
@@ -105,6 +115,12 @@ Merging `source` into `target`:
 4. Deletes the source through the normal delete, so it lands in the trash with a snapshot of exactly which posts it was on.
 
 Undo restores the source on all its posts, then takes the target off the posts that gained it through the merge, moves child terms and menu links back, and recounts both terms. A big undo runs in the background like any big restore.
+
+## Old addresses of deleted terms
+
+The address a term had is saved with its trash item. A visit that ends in a 404 on that address, from something that is not a known bot, is counted, unless the address already redirects. The trash row shows the visits of the last seven days, and "Redirect its old address..." adds a redirect to a term of the same taxonomy or to an address on this site (kind `manual`). Restoring the term takes that redirect away again.
+
+With a persistent object cache a visit only raises a counter in the cache, and WP-Cron writes the counters once an hour. Without one, a visit writes at most once a minute per address, so a very busy address is counted as at least what is shown. Items trashed before this was added have no saved address and are not counted.
 
 ## How old term links work
 

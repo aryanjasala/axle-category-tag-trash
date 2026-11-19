@@ -247,7 +247,7 @@ final class RedirectsTab implements Service {
 									<span class="axle-badge axle-badge--warning"><?php esc_html_e( 'Target deleted', 'axle-category-tag-trash' ); ?></span>
 									<span class="axle-muted"><?php esc_html_e( 'This address shows a 404 until the term comes back.', 'axle-category-tag-trash' ); ?></span>
 								<?php else : ?>
-									<a href="<?php echo esc_url( $row['new_url'] ); ?>"><?php echo esc_html( $row['term_name'] ); ?></a>
+									<a href="<?php echo esc_url( $row['new_url'] ); ?>"><?php echo esc_html( '' !== $row['term_name'] ? $row['term_name'] : (string) wp_parse_url( $row['new_url'], PHP_URL_PATH ) ); ?></a>
 									<br><code class="actt-new"><?php echo esc_html( (string) wp_parse_url( $row['new_url'], PHP_URL_PATH ) ); ?></code>
 								<?php endif; ?>
 							</td>
@@ -310,6 +310,7 @@ final class RedirectsTab implements Service {
 			Redirects::KIND_MOVE   => __( 'Parent changed', 'axle-category-tag-trash' ),
 			Redirects::KIND_MERGE  => __( 'Merged', 'axle-category-tag-trash' ),
 			Redirects::KIND_TRASH  => __( 'Deleted with a redirect', 'axle-category-tag-trash' ),
+			Redirects::KIND_MANUAL => __( 'Added from the trash', 'axle-category-tag-trash' ),
 		);
 
 		return $labels[ $kind ] ?? $kind;

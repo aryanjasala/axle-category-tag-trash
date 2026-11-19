@@ -62,6 +62,13 @@ final class Plugin {
 	private Redirects $redirects;
 
 	/**
+	 * Visits to the old addresses of trashed terms.
+	 *
+	 * @var OldAddresses
+	 */
+	private OldAddresses $old_addresses;
+
+	/**
 	 * Starts the plugin. Runs on `plugins_loaded`.
 	 */
 	public static function boot(): void {
@@ -89,7 +96,8 @@ final class Plugin {
 		$this->purger   = new Purger( $this->trash );
 		$this->merger   = new Merger( $this->trash );
 
-		$this->redirects = new Redirects();
+		$this->redirects     = new Redirects();
+		$this->old_addresses = new OldAddresses( $this->trash, $this->redirects );
 	}
 
 	/**
@@ -129,6 +137,15 @@ final class Plugin {
 	}
 
 	/**
+	 * Old addresses of trashed terms, for other plugins.
+	 *
+	 * @return OldAddresses
+	 */
+	public function old_addresses(): OldAddresses {
+		return $this->old_addresses;
+	}
+
+	/**
 	 * Registers the services.
 	 */
 	private function register(): void {
@@ -139,10 +156,12 @@ final class Plugin {
 			$this->purger,
 			$this->merger,
 			$this->redirects,
-			new TrashPage( $this->trash, $this->restorer, $this->purger, $this->merger, $this->redirects ),
+			new HitCounter(),
+			$this->old_addresses,
+			new TrashPage( $this->trash, $this->restorer, $this->purger, $this->merger, $this->redirects, $this->old_addresses ),
 			new TermScreen( $this->trash, $this->restorer ),
-			new Abilities( $this->trash, $this->restorer, $this->merger, $this->redirects ),
-			new SiteHealth( $this->trash, $this->merger ),
+			new Abilities( $this->trash, $this->restorer, $this->merger, $this->redirects, $this->old_addresses ),
+			new SiteHealth( $this->trash, $this->merger, $this->old_addresses ),
 		);
 
 		foreach ( $services as $service ) {
@@ -150,7 +169,7 @@ final class Plugin {
 		}
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			\WP_CLI::add_command( 'axle-category-tag-trash', new Command( $this->trash, $this->restorer, $this->purger, $this->merger, $this->redirects ) );
+			\WP_CLI::add_command( 'axle-category-tag-trash', new Command( $this->trash, $this->restorer, $this->purger, $this->merger, $this->redirects, $this->old_addresses ) );
 		}
 	}
 }
